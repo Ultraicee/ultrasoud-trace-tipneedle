@@ -2,6 +2,11 @@ import numpy as np
 import math
 
 
+class build_template(object):
+    def __int__(self):
+        pass
+
+
 def distance_ab(a, b):
     """
     description:
@@ -56,3 +61,5 @@ def Template_build(p):
     :return:
         temp
     """
+    a = distance_ab(p[0, :, :], p[1, :, :])
+    b = calp2line(p[0, :, :], p[1, :, :], p[2, :, :])

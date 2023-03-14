@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import scipy.io as io
+import yaml
 
 
 def reshapeData(data_name, Variable_name):
@@ -16,8 +17,6 @@ def reshapeData(data_name, Variable_name):
 
     data = io.loadmat(data_name)
     Data = np.array(data[Variable_name])
-    # data = io.loadmat('Tracedata.mat')
-    # Data = np.array(data['Tracedata'])
     rows = Data.shape[0]  # 原数据的行
     cols = Data.shape[1]  # 原数据的列
     print("Source Data's shape:", Data.shape)
