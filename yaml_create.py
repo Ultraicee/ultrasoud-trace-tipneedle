@@ -3,7 +3,6 @@ import yaml
 import os
 import numpy as np
 import scipy.io as io
-import json
 
 
 class yaml_handle:
@@ -45,7 +44,7 @@ class yaml_handle:
         :param:
             none
         :return:
-            data
+            List
         """
         with open(self.file, encoding=self.encoding) as f:
             data = yaml.load(f.read(), Loader=yaml.FullLoader)
@@ -87,32 +86,6 @@ class yaml_handle:
 
 if __name__ == '__main__':
 
-    #
-    # # print(data_trsm)
-    # curpath = os.path.dirname(os.path.realpath(__file__))
-    # yamlpath = os.path.join(curpath, "caps.yaml")
-    # for i in range(253):
-    #     data_trsm = str(json.loads(dicJson)[f"frame_{i}"])
-    #     # print(data_trsm,type(data_trsm))
-    #
-    #     measures_table = {
-    #         "measure_data":
-    #             {
-    #                 'row': 4,
-    #                 'cols': 3,
-    #                 'frame_id': i,
-    #                 'data': {
-    #                     data_trsm
-    #                 }
-    #             }
-    #     }
-    #     if i == 0:
-    #         with open(yamlpath, "w", encoding="utf-8") as f:
-    #             yaml.dump(measures_table, f)
-    #     else:
-    #         with open(yamlpath, "a", encoding="utf-8") as f:
-    #             yaml.dump(measures_table, f)
-
     # 获取当前脚本所在文件夹的路经
     curpath = os.path.dirname(os.path.realpath(__file__))
     # 获取yaml文件路经
@@ -137,7 +110,7 @@ if __name__ == '__main__':
     frames_number = len(data)  # 对List:data 进行计数
     # print(data["frame_0"]["data"]["r00"])
     Data1 = np.zeros(253 * 12)
-    Data1 = Data1.reshape(253,12)
+    Data1 = Data1.reshape(253, 12)
     for i in range(frames_number):
         Data1[i][0] = data[f"frame_{i}"]["data"]["r00"]
         Data1[i][1] = data[f"frame_{i}"]["data"]["r01"]
