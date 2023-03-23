@@ -27,13 +27,11 @@ def calneedletip(Data):
     T = T.reshape(dn * 3, 1)
     Rm = Rm.reshape(dn * 3, 6)
     needletip_cal = np.linalg.inv(np.transpose(Rm) @ Rm) @ np.transpose(Rm) @ (-T)
-    needletip_D = needletip_cal[:3,:]
-    needletip_m = needletip_cal[3:6,:]
+    needletip_D = needletip_cal[:3, :]
+    needletip_m = needletip_cal[3:6, :]
     # print(needletip_cal)
-    print("器械坐标下的针尖坐标为：",needletip_D.T)
-    print("相机坐标下的针尖坐标为：",needletip_m.T)
-
-
+    print("器械坐标下的针尖坐标为：", needletip_D.T)
+    print("相机坐标下的针尖坐标为：", needletip_m.T)
 
 # data = LoadData.reshapeData()
 # calneedletip(data)

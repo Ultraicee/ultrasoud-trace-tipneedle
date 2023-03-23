@@ -12,30 +12,17 @@ class yaml_handle:
         self.encoding = encoding
         pass
 
-    # def init_yaml(self):
-    #     """
-    #     description:
-    #         初始化创建一个.yaml模板文件
-    #     :param:
-    #         none
-    #     :return:
-    #         data
-    #     """
-    #
-    #     init = {
-    #         "version": 1.0,
-    #         "measure_data": {
-    #             "id": 0,
-    #             "rows": 3,
-    #             "lines": 4,
-    #             "data": 0,
-    #         },
-    #
-    #     }
-    #     # 初始化操作
-    #     with open(self.file, 'w', encoding='utf-8') as f:
-    #         yaml.dump(init, f, allow_unicode=True)
-    #         f.close()
+    def init_yaml(self):
+        """
+        description:
+            创建空白.yaml文件
+        :param:
+            none
+        :return:
+            yaml file
+        """
+        file = open(self.file, "w")
+        file.close()
 
     def get_yaml(self):
         """
@@ -86,27 +73,38 @@ class yaml_handle:
 
 if __name__ == '__main__':
 
+    """
+    # 获取和输入基本信息
+    """
     # 获取当前脚本所在文件夹的路经
     curpath = os.path.dirname(os.path.realpath(__file__))
     # 获取yaml文件路经
-    yamlpath = os.path.join(curpath, "experience_data1.yaml")
+    Yaml_name = input("please Fill in the save name of the .yaml file (path): ")
+    # yamlpath = os.path.join(curpath, "YamlFiles/experience_data1.yaml")
+    yamlpath = os.path.join(curpath, Yaml_name)
+    yaml_op1 = yaml_handle(yamlpath)
+    yaml_op1.init_yaml()
 
-    test_yaml = yaml_handle(yamlpath)
-    # test_yaml.init_yaml()
+    """
+    # 读取.mat 文件操作，并转换成.yaml文件
+    """
+    Mat_name = input("please Fill in the path and name of .mat file: ")
+    data = io.loadmat(Mat_name)
+    Mat_var = input("please Fill in the Variable name: ")
+    Data = np.array(data[Mat_var])
+    print(Data.shape)
+    rows = Data.shape[0]
+    lines = Data.shape[1]
+    Data = Data.reshape(int(rows / 4), 12)
+    dic = {}
+    for i in range(int(rows / 4)):
+        dic[f"frame_{i}"] = Data[i].tolist()
+        yaml_op1.add_yaml(f"frame_{i}", i, 3, 4, dic[f"frame_{i}"])
 
-    data = io.loadmat('./Tip_calibration/Tracedata.mat')
-    Data = np.array(data['Tracedata'])
-    Data = Data.reshape(253, 12)
-
-    # dic = {}
-    # for i in range(253):
-    #     dic[f'frame_{i}'] = Data[i].tolist()
-    # print(dic[f'frame_{i}'][0])
-    # print(dic[f'frame_{i}'][0])
-
-    # test_yaml.add_yaml(f'frame_{i}', i, 3, 4, dic[f'frame_{i}'])
-
-    data = test_yaml.get_yaml()
+    """
+    # 读取.yaml文件，将里面的data数据转换成能使用的格式
+    """
+    data = yaml_op1.get_yaml()  # 读取yaml文件
     frames_number = len(data)  # 对List:data 进行计数
     # print(data["frame_0"]["data"]["r00"])
     Data1 = np.zeros(253 * 12)
@@ -127,5 +125,3 @@ if __name__ == '__main__':
     print(Data1.shape)
     Data1 = Data1.reshape(253, 3, 4)
     print(Data1)
-
-    pass

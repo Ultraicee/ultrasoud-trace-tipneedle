@@ -57,9 +57,32 @@ def Template_build(p):
         按照一定规则制作4个小球的初始化矩阵模板。
         每次标定的时候取同一组的数据中第一帧作为初始模板即可
     :param:
-        3Dimension Matrix Group p
+        3Dimension Matrix Group p , P=[p_0,p_1,p_2,p_3] each Group
     :return:
         temp
     """
-    a = distance_ab(p[0, :, :], p[1, :, :])
-    b = calp2line(p[0, :, :], p[1, :, :], p[2, :, :])
+
+    a = distance_ab(p[0], p[1])
+    c = calp2line(p[0], p[1], p[2])
+    b = math.sqrt(math.pow(distance_ab(p[0], p[2]), 2) - math.pow(c, 2))
+
+    for i in range(1, p.size()):
+        p[i] -= p[0]
+
+    p[0] = [0, 0, 0]
+    r00 = p[1].x / a
+    r01 = p[1].y / a
+    r02 = p[1].z / a
+    r10 = (p[2].x - b * r00) / c
+    r11 = (p[2].y - b * r01) / c
+    r12 = (p[2].z - b * r02) / c
+
+    r20 = r01 * r12 - r11 * r02
+    r21 = r02 * r10 - r00 * r12
+    r22 = r00 * r11 - r01 * r10
+    R = [r00, r10, r20, r01, r11, r21, r02, r12, r22]
+
+    n = p.size()
+
+
+
