@@ -1,5 +1,5 @@
 import numpy as np
-from kabsch import kabsch
+from Others.kabsch import kabsch
 
 # 输入优化好的器械坐标系
 p_tmep = np.array([[0., 7.0747100000000003e+01, 4.1330100000000002e+01, -3.4146000000000001e+01],
@@ -9,6 +9,7 @@ p_tmep = np.array([[0., 7.0747100000000003e+01, 4.1330100000000002e+01, -3.41460
 
 def calneedletip(Data):
     dn = Data.shape[0]  # dn组数据
+    Data = Data.reshape(dn, 3, 4)
     R = np.zeros(dn * 3 * 3).reshape(dn, 3, 3)
     Rm = np.zeros(dn * 3 * 6).reshape(dn, 3, 6)
     T = np.zeros(dn * 1 * 3).reshape(dn, 1, 3)

@@ -1,4 +1,3 @@
-import LoadData_mat
 import yaml
 import os
 import numpy as np
@@ -70,6 +69,36 @@ class yaml_handle:
         with open(self.file, 'a', encoding='utf-8') as f:
             yaml.dump(data, f, allow_unicode=True)
 
+    def conver_yaml(self, data):
+        """
+        description:
+            将.yaml读取到的列表信息:data，转换成数组
+        :param:
+            data:从.yaml文件读取到的列表信息
+        :return:
+            Data1:排列好的二维矩阵信息，shape为:(framesNumbers,12)
+        """
+        frames_number = len(data)  # 对List:data 进行计数
+        # print(data["frame_0"]["data"]["r00"])
+        Data1 = np.zeros(frames_number * 12)
+        Data1 = Data1.reshape(frames_number, 12)
+        for i in range(frames_number):
+            Data1[i][0] = data[f"frame_{i}"]["data"]["r00"]
+            Data1[i][1] = data[f"frame_{i}"]["data"]["r01"]
+            Data1[i][2] = data[f"frame_{i}"]["data"]["r02"]
+            Data1[i][3] = data[f"frame_{i}"]["data"]["r03"]
+            Data1[i][4] = data[f"frame_{i}"]["data"]["r10"]
+            Data1[i][5] = data[f"frame_{i}"]["data"]["r11"]
+            Data1[i][6] = data[f"frame_{i}"]["data"]["r12"]
+            Data1[i][7] = data[f"frame_{i}"]["data"]["r13"]
+            Data1[i][8] = data[f"frame_{i}"]["data"]["r20"]
+            Data1[i][9] = data[f"frame_{i}"]["data"]["r21"]
+            Data1[i][10] = data[f"frame_{i}"]["data"]["r22"]
+            Data1[i][11] = data[f"frame_{i}"]["data"]["r23"]
+        # print(Data1.shape)
+        # Data1 = Data1.reshape(frames_number, 3, 4)
+        return Data1
+
 
 if __name__ == '__main__':
 
@@ -104,24 +133,24 @@ if __name__ == '__main__':
     """
     # 读取.yaml文件，将里面的data数据转换成能使用的格式
     """
-    data = yaml_op1.get_yaml()  # 读取yaml文件
-    frames_number = len(data)  # 对List:data 进行计数
-    # print(data["frame_0"]["data"]["r00"])
-    Data1 = np.zeros(253 * 12)
-    Data1 = Data1.reshape(253, 12)
-    for i in range(frames_number):
-        Data1[i][0] = data[f"frame_{i}"]["data"]["r00"]
-        Data1[i][1] = data[f"frame_{i}"]["data"]["r01"]
-        Data1[i][2] = data[f"frame_{i}"]["data"]["r02"]
-        Data1[i][3] = data[f"frame_{i}"]["data"]["r03"]
-        Data1[i][4] = data[f"frame_{i}"]["data"]["r10"]
-        Data1[i][5] = data[f"frame_{i}"]["data"]["r11"]
-        Data1[i][6] = data[f"frame_{i}"]["data"]["r12"]
-        Data1[i][7] = data[f"frame_{i}"]["data"]["r13"]
-        Data1[i][8] = data[f"frame_{i}"]["data"]["r20"]
-        Data1[i][9] = data[f"frame_{i}"]["data"]["r21"]
-        Data1[i][10] = data[f"frame_{i}"]["data"]["r22"]
-        Data1[i][11] = data[f"frame_{i}"]["data"]["r23"]
-    print(Data1.shape)
-    Data1 = Data1.reshape(253, 3, 4)
-    print(Data1)
+    # data = yaml_op1.get_yaml()  # 读取yaml文件
+    # frames_number = len(data)  # 对List:data 进行计数
+    # # print(data["frame_0"]["data"]["r00"])
+    # Data1 = np.zeros(frames_number * 12)
+    # Data1 = Data1.reshape(frames_number, 12)
+    # for i in range(frames_number):
+    #     Data1[i][0] = data[f"frame_{i}"]["data"]["r00"]
+    #     Data1[i][1] = data[f"frame_{i}"]["data"]["r01"]
+    #     Data1[i][2] = data[f"frame_{i}"]["data"]["r02"]
+    #     Data1[i][3] = data[f"frame_{i}"]["data"]["r03"]
+    #     Data1[i][4] = data[f"frame_{i}"]["data"]["r10"]
+    #     Data1[i][5] = data[f"frame_{i}"]["data"]["r11"]
+    #     Data1[i][6] = data[f"frame_{i}"]["data"]["r12"]
+    #     Data1[i][7] = data[f"frame_{i}"]["data"]["r13"]
+    #     Data1[i][8] = data[f"frame_{i}"]["data"]["r20"]
+    #     Data1[i][9] = data[f"frame_{i}"]["data"]["r21"]
+    #     Data1[i][10] = data[f"frame_{i}"]["data"]["r22"]
+    #     Data1[i][11] = data[f"frame_{i}"]["data"]["r23"]
+    # print(Data1.shape)
+    # Data1 = Data1.reshape(frames_number, 3, 4)
+    # print(Data1)
