@@ -1,20 +1,11 @@
 import numpy as np
 import scipy
-
+from Others import build_template
 # 定义4个三维点的坐标
 p1 = [-292.22600, 82.09300, 940.72300]
-p2 = [-314.62900
-    , 120.36300
-    , 948.17100
-      ]
-p3 = [-247.89000
-    , 108.34900
-    , 929.61000
-      ]
-p4 = [-214.04100
-    , 111.74300
-    , 919.31700
-      ]
+p2 = [-314.62900, 120.36300, 948.17100]
+p3 = [-247.89000, 108.34900, 929.61000]
+p4 = [-214.04100, 111.74300, 919.31700]
 
 # 将4个点的坐标转换为numpy数组
 points = np.array([p1, p2, p3, p4])
@@ -35,3 +26,6 @@ center = np.mean(points, axis=0)
 
 print(center)
 cal(p1, p2, p3, p4)
+
+if __name__ == '__main__':
+    test = build_template.template()

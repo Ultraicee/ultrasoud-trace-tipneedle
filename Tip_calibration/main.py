@@ -22,7 +22,8 @@ if __name__ == '__main__':
     # LoadData_mat.P3dshow(Data)
 
     test = build_template.template(Data)
-    value = test.Template_build()
-    print(value)
+    value = test.reorder()
+    # value = test.Template_build()
+    # print(value)
 
 

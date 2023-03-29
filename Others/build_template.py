@@ -8,15 +8,23 @@ class template:
     """
     description:
         建造针尖模板坐标系。详见技术手册
-
     """
 
     def __init__(self, Matrix3d):
+        # 没有排序，采集到的不同位置的小球数据
         self.P0 = Matrix3d[:, :, 0]
         self.P1 = Matrix3d[:, :, 1]
         self.P2 = Matrix3d[:, :, 2]
         self.P3 = Matrix3d[:, :, 3]
-        # print(self.P0, self.P1, self.P2, self.P3)
+
+        # template P
+        self.Pt_0 = 0
+        self.Pt_1 = 0
+        self.Pt_2 = 0
+        self.Pt_3 = 0
+
+        # flag
+        self.p_flag = [0, 0, 0, 0]
 
     def xyz(self, P):
         """
@@ -33,7 +41,7 @@ class template:
     def distance_ab(self, a, b):
         """
         description:
-            计算三维点AB的二范数
+            计算三维点AB的二范数，（弃用）
         :param:
             3Dimension A，B
         :return:
@@ -78,13 +86,94 @@ class template:
         sinp = math.sqrt(1 - math.pow(cosp, 2))
         return A * B * sinp / P
 
+    def calTriangle(self, a, b, c):
+        """
+        description:
+            计算三个三维点组成的三角形面积。面积越大的三角形所对应的向量的叉积的长度也越大。
+        :param a: 顶点 a
+        :param b: 顶点 b
+        :param c: 顶点 c
+        :return:
+            area 三角形面积
+        """
+        v1 = b - a
+        v2 = c - a
+        cross_product = np.cross(v1, v2)  # 计算向量的叉积
+        area = 0.5 * scipy.linalg.norm(cross_product)
+        return area
+
+    def reorder(self):
+        """
+        description:
+            对收集到的小球数按照模板要求重新排序。
+
+        :return:
+        """
+
+        p = [0, 0, 0, 0]
+        p[0] = self.P0.copy()
+        p[1] = self.P1.copy()
+        p[2] = self.P2.copy()
+        p[3] = self.P3.copy()
+        coutFlag_pt1 = 0
+        coutFlag_pt2 = 0
+
+        # print(p[0], p[1], p[2], p[3])
+
+        # 计算四个小球的中心点
+        center = np.mean(np.array([p[0], p[1], p[2], p[3]]), axis=0)
+        dis1 = scipy.linalg.norm(abs(p[0] - center))
+        dis2 = scipy.linalg.norm(abs(p[1] - center))
+        dis3 = scipy.linalg.norm(abs(p[2] - center))
+        dis4 = scipy.linalg.norm(abs(p[3] - center))
+        # print(dis1, dis2, dis3, dis4)
+
+        # 确定Pt_0
+        min_index = np.argmin([dis1, dis2, dis3, dis4])  # 返回最小值的下标索引
+        print("give me the min: ", min_index)
+        self.p_flag[min_index] = 1
+        self.Pt_0 = p[min_index]
+        print("P0 has reorder")
+
+        # 确认 Pt_1
+        max_line = 0
+
+        for i in range(4):
+            if self.p_flag[i]:
+                continue
+            line = scipy.linalg.norm(abs(self.Pt_0 - p[i]), 2)
+            if line > max_line:
+                max_line = line
+                coutFlag_pt1 = i
+                self.Pt_1 = p[i]
+        self.p_flag[coutFlag_pt1] = 1
+
+        # 确认 Pt_2
+        max_line2 = 0
+        for i in range(4):
+            if self.p_flag[i]:
+                # 已经确认的点将会跳过
+                continue
+            line2 = self.calp2line(self.Pt_0[0], self.Pt_1[0], p[i][0])
+            if line2 > max_line2:
+                max_line2 = line2
+                coutFlag_pt2 = i
+                self.Pt_2 = p[i]
+        self.p_flag[coutFlag_pt2] = 1
+
+        # 确认前面三个点之后，直接进行赋值
+        for i in range(4):
+            if self.p_flag[i]:
+                continue
+            self.Pt_3 = p[i]
+
     def Template_build(self):
         """
         description:
             按照规则制作4个小球的初始化矩阵模板。
             每次标定的时候取同一组的数据中第一帧作为初始模板即可
         :param:
-            3Dimension Matrix Group p , P=[p_0,p_1,p_2,p_3] each Group
+            reorder 3Dimension Matrix Group p , P=[p_0,p_1,p_2,p_3] each Group
         :return:
             temp
         """
