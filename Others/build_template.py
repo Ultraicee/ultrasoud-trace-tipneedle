@@ -10,12 +10,16 @@ class template:
         建造针尖模板坐标系。详见技术手册
     """
 
-    def __init__(self, Matrix3d):
+    def __init__(self, measure3d):
+        """
+        description: 初始化
+        :param measure3d: 相机坐标系下的测量信息 
+        """
         # 没有排序，采集到的不同位置的小球数据
-        self.P0 = Matrix3d[:, :, 0]
-        self.P1 = Matrix3d[:, :, 1]
-        self.P2 = Matrix3d[:, :, 2]
-        self.P3 = Matrix3d[:, :, 3]
+        self.P0 = measure3d[:, :, 0]
+        self.P1 = measure3d[:, :, 1]
+        self.P2 = measure3d[:, :, 2]
+        self.P3 = measure3d[:, :, 3]
 
         # template P
         self.Pt_0 = 0
@@ -170,7 +174,8 @@ class template:
     def Template_build(self):
         """
         description:
-            按照规则制作4个小球的初始化矩阵模板。
+            输入排好序的4个小球
+            按照规则制作初始化矩阵模板。
             每次标定的时候取同一组的数据中第一帧作为初始模板即可
         :param:
             reorder 3Dimension Matrix Group p , P=[p_0,p_1,p_2,p_3] each Group
@@ -179,20 +184,20 @@ class template:
         """
 
         # a = self.distance_ab(self.P0[0], self.P1[0])
-        a = scipy.linalg.norm(abs(self.P0[0] - self.P1[0]), 2)
-        c = self.calp2line(self.P2[0], self.P0[0], self.P1[0])
-        b = math.sqrt(math.pow((scipy.linalg.norm(abs(self.P0[0] - self.P2[0]), 2)), 2) - math.pow(c, 2))
+        a = scipy.linalg.norm(abs(self.Pt_0[0] - self.Pt_1[0]), 2)
+        c = self.calp2line(self.Pt_2[0], self.Pt_0[0], self.Pt_1[0])
+        b = math.sqrt(math.pow((scipy.linalg.norm(abs(self.Pt_0[0] - self.Pt_2[0]), 2)), 2) - math.pow(c, 2))
         print(a, b, c)
         # 对P1,P2,P3 相对于P0进行偏移
-        self.P1[0] -= self.P0[0]
-        self.P2[0] -= self.P0[0]
-        self.P3[0] -= self.P0[0]
+        self.Pt_1[0] -= self.Pt_0[0]
+        self.Pt_2[0] -= self.Pt_0[0]
+        self.Pt_3[0] -= self.Pt_0[0]
 
-        P1_x, P1_y, P1_z = self.xyz(self.P1[0])
-        P2_x, P2_y, P2_z = self.xyz(self.P2[0])
-        P3_x, P3_y, P3_z = self.xyz(self.P3[0])
+        P1_x, P1_y, P1_z = self.xyz(self.Pt_1[0])
+        P2_x, P2_y, P2_z = self.xyz(self.Pt_2[0])
+        P3_x, P3_y, P3_z = self.xyz(self.Pt_3[0])
 
-        self.P0[0] = [0, 0, 0]
+        self.Pt_0[0] = [0, 0, 0]
         r00 = P1_x / a
         r01 = P1_y / a
         r02 = P1_z / a
@@ -208,9 +213,9 @@ class template:
         # print(R)
         line = np.array([[P1_x, P1_y, P1_z], [P2_x, P2_y, P2_z], [P3_x, P3_y, P3_z]])
 
-        R_inv = R.T
-        line_inv = line.T
+        R_inv = np.linalg.inv(R)
+        line_inv = np.linalg.inv(line)
         # print(R_inv)
-        temp = R_inv * line_inv
+        temp = np.matmul(R_inv, line_inv)
 
         return temp
