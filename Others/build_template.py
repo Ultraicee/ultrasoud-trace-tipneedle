@@ -13,7 +13,7 @@ class template:
     def __init__(self, measure3d):
         """
         description: 初始化
-        :param measure3d: 相机坐标系下的测量信息 
+        :param measure3d: 相机坐标系下的测量信息
         """
         # 没有排序，采集到的不同位置的小球数据
         self.P0 = measure3d[:, :, 0]
@@ -21,7 +21,13 @@ class template:
         self.P2 = measure3d[:, :, 2]
         self.P3 = measure3d[:, :, 3]
 
-        # template P
+        # 排序之后的小球数据
+        self.reorder_P0 = 0
+        self.reorder_P1 = 0
+        self.reorder_P2 = 0
+        self.reorder_P3 = 0
+
+        # 模板坐标系Pt各点坐标
         self.Pt_0 = 0
         self.Pt_1 = 0
         self.Pt_2 = 0
@@ -122,8 +128,6 @@ class template:
         coutFlag_pt1 = 0
         coutFlag_pt2 = 0
 
-        # print(p[0], p[1], p[2], p[3])
-
         # 计算四个小球的中心点
         center = np.mean(np.array([p[0], p[1], p[2], p[3]]), axis=0)
         dis1 = scipy.linalg.norm(abs(p[0] - center))
@@ -136,42 +140,43 @@ class template:
         min_index = np.argmin([dis1, dis2, dis3, dis4])  # 返回最小值的下标索引
         print("give me the min: ", min_index)
         self.p_flag[min_index] = 1
-        self.Pt_0 = p[min_index]
-        print("P0 has reorder")
+        self.reorder_P0 = p[min_index]
+        # print("P0 has reorder")
 
         # 确认 Pt_1
         max_line = 0
-
         for i in range(4):
             if self.p_flag[i]:
                 continue
-            line = scipy.linalg.norm(abs(self.Pt_0 - p[i]), 2)
+            line = scipy.linalg.norm(abs(self.reorder_P0 - p[i]), 2)
             if line > max_line:
                 max_line = line
                 coutFlag_pt1 = i
-                self.Pt_1 = p[i]
+                self.reorder_P1 = p[i]
         self.p_flag[coutFlag_pt1] = 1
 
-        # 确认 Pt_2
+        # 确认 reorder_P2
         max_line2 = 0
         for i in range(4):
             if self.p_flag[i]:
                 # 已经确认的点将会跳过
                 continue
-            line2 = self.calp2line(self.Pt_0[0], self.Pt_1[0], p[i][0])
+            line2 = self.calp2line(self.reorder_P0[0], self.reorder_P1[0], p[i][0])
             if line2 > max_line2:
                 max_line2 = line2
                 coutFlag_pt2 = i
-                self.Pt_2 = p[i]
+                self.reorder_P2 = p[i]
         self.p_flag[coutFlag_pt2] = 1
 
         # 确认前面三个点之后，直接进行赋值
         for i in range(4):
             if self.p_flag[i]:
                 continue
-            self.Pt_3 = p[i]
+            self.reorder_P3 = p[i]
 
-    def Template_build(self):
+        print("Template has ordered.")
+
+    def Template_build(self, N):
         """
         description:
             输入排好序的4个小球
@@ -184,38 +189,41 @@ class template:
         """
 
         # a = self.distance_ab(self.P0[0], self.P1[0])
-        a = scipy.linalg.norm(abs(self.Pt_0[0] - self.Pt_1[0]), 2)
-        c = self.calp2line(self.Pt_2[0], self.Pt_0[0], self.Pt_1[0])
-        b = math.sqrt(math.pow((scipy.linalg.norm(abs(self.Pt_0[0] - self.Pt_2[0]), 2)), 2) - math.pow(c, 2))
-        print(a, b, c)
+        a = scipy.linalg.norm(abs(self.reorder_P0[N] - self.reorder_P1[N]), 2)
+        c = self.calp2line(self.reorder_P1[N], self.reorder_P0[N], self.reorder_P2[N])
+        b = math.sqrt(
+            math.pow((scipy.linalg.norm(abs(self.reorder_P0[N] - self.reorder_P2[N]), 2)), 2) - math.pow(c, 2))
+        # print(a, b, c)
         # 对P1,P2,P3 相对于P0进行偏移
-        self.Pt_1[0] -= self.Pt_0[0]
-        self.Pt_2[0] -= self.Pt_0[0]
-        self.Pt_3[0] -= self.Pt_0[0]
 
-        P1_x, P1_y, P1_z = self.xyz(self.Pt_1[0])
-        P2_x, P2_y, P2_z = self.xyz(self.Pt_2[0])
-        P3_x, P3_y, P3_z = self.xyz(self.Pt_3[0])
+        self.Pt_1 = self.reorder_P1[N].copy() - self.reorder_P0[N].copy()
+        self.Pt_2 = self.reorder_P2[N].copy() - self.reorder_P0[N].copy()
+        self.Pt_3 = self.reorder_P3[N].copy() - self.reorder_P0[N].copy()
+        self.Pt_0 = [0, 0, 0]
+        P0_x, P0_y, P0_z = self.xyz(self.Pt_0)
+        P1_x, P1_y, P1_z = self.xyz(self.Pt_1)
+        P2_x, P2_y, P2_z = self.xyz(self.Pt_2)
+        P3_x, P3_y, P3_z = self.xyz(self.Pt_3)
 
-        self.Pt_0[0] = [0, 0, 0]
         r00 = P1_x / a
         r01 = P1_y / a
         r02 = P1_z / a
         r10 = (P2_x - b * r00) / c
         r11 = (P2_y - b * r01) / c
         r12 = (P2_z - b * r02) / c
-        # outer r20,r21,r22
+
+        # R旋转矩阵第三列 r20,r21,r22
         r20 = r01 * r12 - r11 * r02
         r21 = r02 * r10 - r00 * r12
         r22 = r00 * r11 - r01 * r10
 
         R = np.array([[r00, r10, r20], [r01, r11, r21], [r02, r12, r22]])
-        # print(R)
-        line = np.array([[P1_x, P1_y, P1_z], [P2_x, P2_y, P2_z], [P3_x, P3_y, P3_z]])
 
-        R_inv = np.linalg.inv(R)
-        line_inv = np.linalg.inv(line)
-        # print(R_inv)
-        temp = np.matmul(R_inv, line_inv)
+        line = np.array([[P0_x, P0_y, P0_z], [P1_x, P1_y, P1_z], [P2_x, P2_y, P2_z], [P3_x, P3_y, P3_z]])
+
+        R_inv = np.linalg.inv(R)  # R的逆
+        line_inv = line.T  # T的转置
+
+        temp = np.matmul(R_inv, line_inv)  # 矩阵相乘
 
         return temp
