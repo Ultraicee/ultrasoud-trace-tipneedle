@@ -184,6 +184,7 @@ class template:
             每次标定的时候取同一组的数据中第一帧作为初始模板即可
         :param:
             reorder 3Dimension Matrix Group p , P=[p_0,p_1,p_2,p_3] each Group
+            N：the N frames.
         :return:
             temp
         """
