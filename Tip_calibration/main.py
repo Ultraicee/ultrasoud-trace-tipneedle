@@ -1,4 +1,4 @@
-from Others import LoadData_mat, yaml_create,build_template
+from Others import LoadData_mat, yaml_create, build_template
 from Tip_calibration import CalNeedleTip
 import os
 
@@ -26,5 +26,3 @@ if __name__ == '__main__':
     tamplate = test.Template_build(0)
 
     print(tamplate)
-
-
