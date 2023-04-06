@@ -24,10 +24,11 @@ def calneedletip(Data):
     #   可以求出大体针尖的坐标位置
     # Rm = Ri-Rj,Ri为每组的数据，令Rj为单位矩阵，每次进行计算
 
-    # 最小二乘法求解针尖
+    # （线性）最小二乘法求解针尖
     T = T.reshape(dn * 3, 1)
     Rm = Rm.reshape(dn * 3, 6)
-    needletip_cal = np.linalg.inv(np.transpose(Rm) @ Rm) @ np.transpose(Rm) @ (-T)
+    # 系数解
+    needletip_cal = np.linalg.inv(np.transpose(Rm) @ Rm) @ np.transpose(Rm) @ (-T)      # （R^T*R)^-1*R^T*T
     needletip_D = needletip_cal[:3, :]
     needletip_m = needletip_cal[3:6, :]
     # print(needletip_cal)

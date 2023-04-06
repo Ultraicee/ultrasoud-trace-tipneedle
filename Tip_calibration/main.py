@@ -23,6 +23,6 @@ if __name__ == '__main__':
 
     test = build_template.template(Data)
     value = test.reorder()
-    tamplate = test.Template_build(0)
+    tamplate = test.Template_build(200)
 
-    print(tamplate)
+    print(tamplate.shape)
