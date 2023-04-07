@@ -106,6 +106,7 @@ class template:
         :return:
             area 三角形面积
         """
+
         v1 = b - a
         v2 = c - a
         cross_product = np.cross(v1, v2)  # 计算向量的叉积
@@ -228,3 +229,13 @@ class template:
         temp = np.matmul(R_inv, line_inv)  # 矩阵相乘
 
         return temp
+
+    def Templata_opt(self):
+        """
+        description:
+        利用梯度下降的方法对Template_build建造的模板坐标系进行优化。
+
+        :return:
+        优化后的模板坐标系
+        """
+        pass
