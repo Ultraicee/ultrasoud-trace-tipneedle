@@ -1,19 +1,22 @@
 import numpy as np
 import math
-
 import scipy
+from sympy import symbols, diff
+from Others.kabsch import kabsch
 
 
 class template:
     """
     description:
-        建造针尖模板坐标系。详见技术手册
+        建造针尖模板坐标系。
     """
 
-    def __init__(self, measure3d):
+    def __init__(self, measure3d, degree=1, lr=0.01, num_iter=1000):
         """
-        description: 初始化
-        :param measure3d: 相机坐标系下的测量信息
+        description:
+        初始化
+        :param:
+        measure3d: 相机坐标系下的测量信息
         """
         # 没有排序，采集到的不同位置的小球数据
         self.P0 = measure3d[:, :, 0]
@@ -35,6 +38,12 @@ class template:
 
         # flag
         self.p_flag = [0, 0, 0, 0]
+
+        # 梯度下降相关函数
+        self.degree = degree
+        self.lr = lr
+        self.num_iter = num_iter
+        self.theta = None
 
     def xyz(self, P):
         """
@@ -182,7 +191,8 @@ class template:
         description:
             输入排好序的4个小球
             按照规则制作初始化矩阵模板。
-            每次标定的时候取同一组的数据中第一帧作为初始模板即可
+            每次标定的时候取同一组的数据中第一帧作为初始模板即可,剩下的交给模板优化函数
+
         :param:
             reorder 3Dimension Matrix Group p , P=[p_0,p_1,p_2,p_3] each Group
             N：the N frames.
@@ -230,12 +240,62 @@ class template:
 
         return temp
 
-    def Templata_opt(self):
+    def loss_function(self, template_init, epoch):
         """
-        description:
-        利用梯度下降的方法对Template_build建造的模板坐标系进行优化。
+        description: 根据公式构建并计算梯度下降当中的loss函数
 
         :return:
-        优化后的模板坐标系
+        """
+        theta = np.zeros((1, 4))
+        E_theta = np.zeros((1, 4))
+
+        theta = template_init.T  # 如果使用的模板的shape为(3,4)的时候，将其进行转置。
+        # 使用kabsch计算旋转平移矩阵的时候记得把模板坐标放在第二个参数
+        R, t = kabsch(
+            np.array([self.reorder_P0[epoch], self.reorder_P1[epoch], self.reorder_P2[epoch], self.reorder_P3[epoch]]),
+            theta)
+
+        E_theta = np.array([
+            R @ theta[0] + t,
+            R @ theta[1] + t,
+            R @ theta[2] + t,
+            R @ theta[3] + t
+        ])
+
+        return E_theta
+
+    def jacobian_matrix(self, function, theta, epoch):
+        """
+        description：
+        计算雅可比矩阵
+        :param:
+        function: loss函数
+        theta: loss函数的输入
+        """
+        J = np.zeros((1, len(function)))
+        theta = symbols('theta', real=True)  # 将参数变量theta符号化
+        J = np.array([
+            diff(self.loss_function())
+        ])
+        return J
+
+    def gradient(self, alpha, epoch):
+        """
+        description:
+        计算梯度值
+
+        :param:
+        alpha:步长
+        epoch:迭代次数
+
+        :return:
+        """
+
+    def Template_opt(self):
+        """
+        description:
+        梯度下降主函数
+
+        :return:
         """
         pass

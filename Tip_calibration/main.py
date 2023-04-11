@@ -1,5 +1,6 @@
-from Others import LoadData_mat, yaml_create, build_template
+from Others import LoadData_mat, yaml_create, build_template, kabsch
 from Tip_calibration import CalNeedleTip
+import numpy as np
 import os
 
 if __name__ == '__main__':
@@ -23,6 +24,21 @@ if __name__ == '__main__':
 
     test = build_template.template(Data)
     value = test.reorder()
-    tamplate = test.Template_build(200)
+    tamplate = test.Template_build(0)
 
-    print(tamplate.shape)
+    # tamplate = tamplate.T
+    # test_data = np.array([test.reorder_P0[0], test.reorder_P1[0], test.reorder_P2[0], test.reorder_P3[0]])
+    #
+    # R, t = kabsch.kabsch(test_data, tamplate)
+    # print(R)
+    # print(t)
+    # print("-----------------")
+    # new0 = R @ tamplate[0] + t
+    # new1 = R @ tamplate[1] + t
+    # new2 = R @ tamplate[2] + t
+    # new3 = R @ tamplate[3] + t
+    # new = np.array([new0, new1, new2, new3])
+    # loss = new - test_data
+    # print(loss)
+
+    print(test.loss_function(tamplate, 0))
