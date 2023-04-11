@@ -1,7 +1,7 @@
 import numpy as np
 import math
 import scipy
-from sympy import symbols, diff
+from sympy import symbols, diff, Matrix
 from Others.kabsch import kabsch
 
 
@@ -140,10 +140,10 @@ class template:
 
         # 计算四个小球的中心点
         center = np.mean(np.array([p[0], p[1], p[2], p[3]]), axis=0)
-        dis1 = scipy.linalg.norm(abs(p[0] - center))
-        dis2 = scipy.linalg.norm(abs(p[1] - center))
-        dis3 = scipy.linalg.norm(abs(p[2] - center))
-        dis4 = scipy.linalg.norm(abs(p[3] - center))
+        dis1 = np.linalg.norm(abs(p[0] - center))
+        dis2 = np.linalg.norm(abs(p[1] - center))
+        dis3 = np.linalg.norm(abs(p[2] - center))
+        dis4 = np.linalg.norm(abs(p[3] - center))
         # print(dis1, dis2, dis3, dis4)
 
         # 确定Pt_0
@@ -158,7 +158,7 @@ class template:
         for i in range(4):
             if self.p_flag[i]:
                 continue
-            line = scipy.linalg.norm(abs(self.reorder_P0 - p[i]), 2)
+            line = np.linalg.norm(abs(self.reorder_P0 - p[i]), 2)
             if line > max_line:
                 max_line = line
                 coutFlag_pt1 = i
@@ -201,21 +201,20 @@ class template:
         """
 
         # a = self.distance_ab(self.P0[0], self.P1[0])
-        a = scipy.linalg.norm(abs(self.reorder_P0[N] - self.reorder_P1[N]), 2)
+        a = np.linalg.norm(abs(self.reorder_P0[N] - self.reorder_P1[N]), 2)
         c = self.calp2line(self.reorder_P1[N], self.reorder_P0[N], self.reorder_P2[N])
         b = math.sqrt(
-            math.pow((scipy.linalg.norm(abs(self.reorder_P0[N] - self.reorder_P2[N]), 2)), 2) - math.pow(c, 2))
+            math.pow((np.linalg.norm(abs(self.reorder_P0[N] - self.reorder_P2[N]), 2)), 2) - math.pow(c, 2))
         # print(a, b, c)
         # 对P1,P2,P3 相对于P0进行偏移
-
-        self.Pt_1 = self.reorder_P1[N].copy() - self.reorder_P0[N].copy()
-        self.Pt_2 = self.reorder_P2[N].copy() - self.reorder_P0[N].copy()
-        self.Pt_3 = self.reorder_P3[N].copy() - self.reorder_P0[N].copy()
-        self.Pt_0 = [0, 0, 0]
-        P0_x, P0_y, P0_z = self.xyz(self.Pt_0)
-        P1_x, P1_y, P1_z = self.xyz(self.Pt_1)
-        P2_x, P2_y, P2_z = self.xyz(self.Pt_2)
-        P3_x, P3_y, P3_z = self.xyz(self.Pt_3)
+        Pt_temp1 = self.reorder_P1[N].copy() - self.reorder_P0[N].copy()
+        Pt_temp2 = self.reorder_P2[N].copy() - self.reorder_P0[N].copy()
+        Pt_temp3 = self.reorder_P3[N].copy() - self.reorder_P0[N].copy()
+        Pt_temp0 = [0, 0, 0]
+        P0_x, P0_y, P0_z = self.xyz(Pt_temp0)
+        P1_x, P1_y, P1_z = self.xyz(Pt_temp1)
+        P2_x, P2_y, P2_z = self.xyz(Pt_temp2)
+        P3_x, P3_y, P3_z = self.xyz(Pt_temp3)
 
         r00 = P1_x / a
         r01 = P1_y / a
@@ -237,10 +236,15 @@ class template:
         line_inv = line.T  # T的转置
 
         temp = np.matmul(R_inv, line_inv)  # 矩阵相乘
+        temp_t = temp.T
+        self.Pt_0 = temp_t[0]
+        self.Pt_1 = temp_t[1]
+        self.Pt_2 = temp_t[2]
+        self.Pt_3 = temp_t[3]
 
         return temp
 
-    def loss_function(self, template_init, epoch):
+    def gradient(self, template_init, measure3D):
         """
         description: 根据公式构建并计算梯度下降当中的loss函数
 
@@ -250,10 +254,12 @@ class template:
         E_theta = np.zeros((1, 4))
 
         theta = template_init.T  # 如果使用的模板的shape为(3,4)的时候，将其进行转置。
+        theta0 = theta[0]
+        theta1 = theta[1]
+        theta2 = theta[2]
+        theta3 = theta[3]
         # 使用kabsch计算旋转平移矩阵的时候记得把模板坐标放在第二个参数
-        R, t = kabsch(
-            np.array([self.reorder_P0[epoch], self.reorder_P1[epoch], self.reorder_P2[epoch], self.reorder_P3[epoch]]),
-            theta)
+        R, t = kabsch(measure3D, theta)
 
         E_theta = np.array([
             R @ theta[0] + t,
@@ -264,7 +270,7 @@ class template:
 
         return E_theta
 
-    def jacobian_matrix(self, function, theta, epoch):
+    def jacobian_matrix(self, function, theta):
         """
         description：
         计算雅可比矩阵
@@ -272,24 +278,23 @@ class template:
         function: loss函数
         theta: loss函数的输入
         """
-        J = np.zeros((1, len(function)))
-        theta = symbols('theta', real=True)  # 将参数变量theta符号化
-        J = np.array([
-            diff(self.loss_function())
-        ])
-        return J
 
-    def gradient(self, alpha, epoch):
-        """
-        description:
-        计算梯度值
+        theta, function = symbols('theta function')  # 将loss函数和函数参数变量theta符号化
 
-        :param:
-        alpha:步长
-        epoch:迭代次数
+        f = Matrix([])
+        f.jacobian()
 
-        :return:
-        """
+    # def gradient(self, alpha, epoch):
+    #     """
+    #     description:
+    #     计算梯度值
+    #
+    #     :param:
+    #     alpha:步长
+    #     epoch:迭代次数
+    #
+    #     :return:
+    #     """
 
     def Template_opt(self):
         """
