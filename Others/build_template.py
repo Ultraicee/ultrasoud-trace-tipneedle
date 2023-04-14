@@ -1,8 +1,12 @@
 import numpy as np
 import math
 import scipy
+import torch
 from sympy import symbols, diff, Matrix
 from Others.kabsch import kabsch
+# 尝试利用pytorch方法解决雅可比矩阵问题
+from torch.autograd.functional import jacobian
+from torch import tensor
 
 
 class template:
@@ -36,8 +40,12 @@ class template:
         self.Pt_2 = 0
         self.Pt_3 = 0
 
-        # flag
+        # 制作模板时候使用的flag
         self.p_flag = [0, 0, 0, 0]
+
+        # RT旋转平移矩阵temp
+        self.R = 0
+        self.t = 0
 
         # 梯度下降相关函数
         self.degree = degree
@@ -122,12 +130,12 @@ class template:
         area = 0.5 * scipy.linalg.norm(cross_product)
         return area
 
-    def reorder(self):
+    def Template_PointReorder(self):
         """
         description:
             对收集到的小球数按照模板要求重新排序。
 
-        :return:
+        :return: no
         """
 
         p = [0, 0, 0, 0]
@@ -148,7 +156,7 @@ class template:
 
         # 确定Pt_0
         min_index = np.argmin([dis1, dis2, dis3, dis4])  # 返回最小值的下标索引
-        print("give me the min: ", min_index)
+        # print("give me the min: ", min_index)
         self.p_flag[min_index] = 1
         self.reorder_P0 = p[min_index]
         # print("P0 has reorder")
@@ -186,7 +194,7 @@ class template:
 
         print("Template has ordered.")
 
-    def Template_build(self, N):
+    def Template_initBuild(self, N):
         """
         description:
             输入排好序的4个小球
@@ -244,45 +252,106 @@ class template:
 
         return temp
 
-    def gradient(self, template_init, measure3D):
+    # def gradient(self, template_init, measure3D):
+    #     """
+    #     description: 根据公式构建并计算梯度下降当中的loss函数
+    #
+    #     :return:
+    #     """
+    #     theta = np.zeros((1, 4))
+    #     E_theta = np.zeros((1, 4))
+    #
+    #     theta = template_ienit.T  # 如果使用的模板的shape为(3,4)的时候，将其进行转置。
+    #     theta0 = theta[0]
+    #     theta1 = theta[1]
+    #     theta2 = theta[2]
+    #     theta3 = theta[3]
+    #     # 使用kabsch计算旋转平移矩阵的时候记得把模板坐标放在第二个参数
+    #     R, t = kabsch(measure3D, theta)
+    #
+    #     E_theta = np.array([
+    #         R @ theta[0] + t,
+    #         R @ theta[1] + t,
+    #         R @ theta[2] + t,
+    #         R @ theta[3] + t
+    #     ])
+    #
+    #     return E_theta
+
+    def loss_function(self, x1, x2, x3, x4):
         """
-        description: 根据公式构建并计算梯度下降当中的loss函数
-
-        :return:
+        description:
+            损失函数本体表达
+        :param x1: PE1
+        :param x2: PE2
+        :param x3: PE3
+        :param x4: PE4
+        :param N: 第N帧测量的数据，N应该大于0
+        :return: 函数表达式
         """
-        theta = np.zeros((1, 4))
-        E_theta = np.zeros((1, 4))
+        # R, t = kabsch(
+        #     (np.array(self.reorder_P0[1], self.reorder_P1[1], self.reorder_P2[1], self.reorder_P3[1])),  # 参数1
+        #     (np.array(self.Pt_0, self.Pt_1, self.Pt_2, self.Pt_3))  # 参数2
+        # )
+        # R = torch.tensor(R)
+        # t = torch.tensor(t)
+        return self.R @ x1 + self.t, self.R @ x2 + self.t, self.R @ x3 + self.t, self.R @ x4 + self.t
 
-        theta = template_init.T  # 如果使用的模板的shape为(3,4)的时候，将其进行转置。
-        theta0 = theta[0]
-        theta1 = theta[1]
-        theta2 = theta[2]
-        theta3 = theta[3]
-        # 使用kabsch计算旋转平移矩阵的时候记得把模板坐标放在第二个参数
-        R, t = kabsch(measure3D, theta)
-
-        E_theta = np.array([
-            R @ theta[0] + t,
-            R @ theta[1] + t,
-            R @ theta[2] + t,
-            R @ theta[3] + t
-        ])
-
-        return E_theta
-
-    def jacobian_matrix(self, function, theta):
+    def jacobian_matrix(self, func, x1, x2, x3, x4, N):
         """
         description：
-        计算雅可比矩阵
+            利用torch包计算梯度下降优化中的雅可比矩阵
         :param:
         function: loss函数
         theta: loss函数的输入
         """
+        Measure = np.array([self.reorder_P0[N], self.reorder_P1[N], self.reorder_P2[N], self.reorder_P3[N]])
+        template_N = np.array([self.Pt_0, self.Pt_1, self.Pt_2, self.Pt_3])
+        self.R, self.t = kabsch(Measure, template_N)
+        # 将参数转换成tensor类型
+        x1 = torch.tensor(x1)
+        x2 = torch.tensor(x2)
+        x3 = torch.tensor(x3)
+        x4 = torch.tensor(x4)
+        self.R = torch.tensor(self.R)
+        self.t = torch.tensor(self.t)
+        J_torch = jacobian(func, (x1, x2, x3, x4))
+        dn1 = len(J_torch)
+        dn2 = len(J_torch[1])
 
-        theta, function = symbols('theta function')  # 将loss函数和函数参数变量theta符号化
+        J_np = np.zeros((dn1, dn2 * 9))
+        # 将torch计算后得到的雅可比矩阵转换成numpy格式(shape(4,36)),并从shape(4,36)->(12,12)
+        for i in range(len(J_torch)):
+            for j in range(len(J_torch[i])):
+                temp = J_torch[j][i]
+                temp = temp.numpy()
+                temp = temp.reshape(1, 9)
 
-        f = Matrix([])
-        f.jacobian()
+                J_np[i][j * 9] = temp[0][0]
+                J_np[i][j * 9 + 1] = temp[0][1]
+                J_np[i][j * 9 + 2] = temp[0][2]
+                J_np[i][j * 9 + 3] = temp[0][3]
+                J_np[i][j * 9 + 4] = temp[0][4]
+                J_np[i][j * 9 + 5] = temp[0][5]
+                J_np[i][j * 9 + 6] = temp[0][6]
+                J_np[i][j * 9 + 7] = temp[0][7]
+                J_np[i][j * 9 + 8] = temp[0][8]
+
+        # 重新建立一个矩阵按照需要的格式填入J_np里的数据
+        # shape(12,12)
+        J = np.zeros((12, 12))
+        for j in range(4):
+            # for i in range(3):
+            J[j * 3][j * 3] = J_np[j][j * 9]
+            J[j * 3][j * 3 + 1] = J_np[j][j * 9 + 1]
+            J[j * 3][j * 3 + 2] = J_np[j][j * 9 + 2]
+            J[j * 3 + 1][j * 3] = J_np[j][j * 9 + 3]
+            J[j * 3 + 1][j * 3 + 1] = J_np[j][j * 9 + 4]
+            J[j * 3 + 1][j * 3 + 2] = J_np[j][j * 9 + 5]
+            J[j * 3 + 2][j * 3] = J_np[j][j * 9 + 6]
+            J[j * 3 + 2][j * 3 + 1] = J_np[j][j * 9 + 7]
+            J[j * 3 + 2][j * 3 + 2] = J_np[j][j * 9 + 8]
+        return J
 
     # def gradient(self, alpha, epoch):
     #     """
@@ -304,3 +373,11 @@ class template:
         :return:
         """
         pass
+
+    def Template_total(self):
+        """
+        description:
+            计算并优化模板坐标系的总执行函数。
+        :param:
+        :return:
+        """

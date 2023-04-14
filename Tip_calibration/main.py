@@ -1,3 +1,5 @@
+import torch
+
 from Others import LoadData_mat, yaml_create, build_template, kabsch
 from Tip_calibration import CalNeedleTip
 import numpy as np
@@ -13,7 +15,9 @@ if __name__ == '__main__':
     yaml_op1 = yaml_create.yaml_handle(yamlpath)
     data = yaml_op1.get_yaml()
     Data = yaml_op1.conver_yaml(data)
-    print(Data.shape)
+
+    N = len(data)
+    # print(len(data))
     # 计算针尖在世界坐标系和器械坐标系下的位置
     CalNeedleTip.calneedletip(Data)
 
@@ -23,22 +27,27 @@ if __name__ == '__main__':
     # LoadData_mat.P3dshow(Data)
 
     test = build_template.template(Data)
-    value = test.reorder()
-    tamplate = test.Template_build(0)
+    test.Template_PointReorder()
+    template = test.Template_initBuild(0)  # 使用第一帧进行模板坐标系的建立，后面将不再使用第一帧。
 
-    # tamplate = tamplate.T
-    # test_data = np.array([test.reorder_P0[0], test.reorder_P1[0], test.reorder_P2[0], test.reorder_P3[0]])
-    #
-    # R, t = kabsch.kabsch(test_data, tamplate)
-    # print(R)
-    # print(t)
-    # print("-----------------")
-    # new0 = R @ tamplate[0] + t
-    # new1 = R @ tamplate[1] + t
-    # new2 = R @ tamplate[2] + t
-    # new3 = R @ tamplate[3] + t
-    # new = np.array([new0, new1, new2, new3])
-    # loss = new - test_data
+    """
+        求模板坐标集合，看看后面能否使用最小二乘求解
+    """
+    # template = np.zeros((N, 12))
+    # for i in range(N):
+    #     temp = test.Template_build(i).reshape(1, 12)
+    #     template[i] = temp
+    # print("模板坐标集合为: ", template)
+
+    """
+        求loss函数的雅可比矩阵
+    """
+    pe1 = template.T[0]
+    pe2 = template.T[1]
+    pe3 = template.T[2]
+    pe4 = template.T[3]
+    # loss = test.loss_function(pe1, pe2, pe3, pe4)
     # print(loss)
-
-    print(test.loss_function(tamplate, 0))
+    J = test.jacobian_matrix(test.loss_function, pe1, pe2, pe3, pe4, 1)
+    # a_ = list(a)
+    # print(a_[1])
