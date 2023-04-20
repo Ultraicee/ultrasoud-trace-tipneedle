@@ -32,6 +32,7 @@ if __name__ == '__main__':
 
     """
         求模板坐标集合，看看后面能否使用最小二乘求解
+        :不行，误差太大了
     """
     # template = np.zeros((N, 12))
     # for i in range(N):
@@ -48,6 +49,8 @@ if __name__ == '__main__':
     pe4 = template.T[3]
     # loss = test.loss_function(pe1, pe2, pe3, pe4)
     # print(loss)
-    J = test.jacobian_matrix(test.loss_function, pe1, pe2, pe3, pe4, 1)
-    # a_ = list(a)
-    # print(a_[1])
+    test.Matrix_RT(1)
+    f = test.loss_function(pe1, pe2, pe3, pe4)
+    # J = test.jacobian_matrix(test.loss_function, pe1, pe2, pe3, pe4)
+    t_value = test.Template_opt(0.01, 1, pe1, pe2, pe3, pe4)
+    print(t_value)

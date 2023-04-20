@@ -27,6 +27,8 @@ class template:
         self.P1 = measure3d[:, :, 1]
         self.P2 = measure3d[:, :, 2]
         self.P3 = measure3d[:, :, 3]
+        # 采集数据的张数
+        self.Fig_N = len(measure3d)
 
         # 排序之后的小球数据
         self.reorder_P0 = 0
@@ -252,31 +254,16 @@ class template:
 
         return temp
 
-    # def gradient(self, template_init, measure3D):
-    #     """
-    #     description: 根据公式构建并计算梯度下降当中的loss函数
-    #
-    #     :return:
-    #     """
-    #     theta = np.zeros((1, 4))
-    #     E_theta = np.zeros((1, 4))
-    #
-    #     theta = template_ienit.T  # 如果使用的模板的shape为(3,4)的时候，将其进行转置。
-    #     theta0 = theta[0]
-    #     theta1 = theta[1]
-    #     theta2 = theta[2]
-    #     theta3 = theta[3]
-    #     # 使用kabsch计算旋转平移矩阵的时候记得把模板坐标放在第二个参数
-    #     R, t = kabsch(measure3D, theta)
-    #
-    #     E_theta = np.array([
-    #         R @ theta[0] + t,
-    #         R @ theta[1] + t,
-    #         R @ theta[2] + t,
-    #         R @ theta[3] + t
-    #     ])
-    #
-    #     return E_theta
+    def Matrix_RT(self, N):
+        """
+        description:
+            计算初始模板坐标系和测量数据的平移旋转矩阵
+        :param N: the N frame measure data
+        :return:NONE
+        """
+        Measure = np.array([self.reorder_P0[N], self.reorder_P1[N], self.reorder_P2[N], self.reorder_P3[N]])
+        template_N = np.array([self.Pt_0, self.Pt_1, self.Pt_2, self.Pt_3])
+        self.R, self.t = kabsch(Measure, template_N)
 
     def loss_function(self, x1, x2, x3, x4):
         """
@@ -286,28 +273,23 @@ class template:
         :param x2: PE2
         :param x3: PE3
         :param x4: PE4
-        :param N: 第N帧测量的数据，N应该大于0
-        :return: 函数表达式
+
+        :return: type:tuple
         """
-        # R, t = kabsch(
-        #     (np.array(self.reorder_P0[1], self.reorder_P1[1], self.reorder_P2[1], self.reorder_P3[1])),  # 参数1
-        #     (np.array(self.Pt_0, self.Pt_1, self.Pt_2, self.Pt_3))  # 参数2
-        # )
-        # R = torch.tensor(R)
-        # t = torch.tensor(t)
+
         return self.R @ x1 + self.t, self.R @ x2 + self.t, self.R @ x3 + self.t, self.R @ x4 + self.t
 
-    def jacobian_matrix(self, func, x1, x2, x3, x4, N):
+    def jacobian_matrix(self, func, x1, x2, x3, x4):
         """
         description：
             利用torch包计算梯度下降优化中的雅可比矩阵
-        :param:
-        function: loss函数
-        theta: loss函数的输入
+        :param: function: loss函数
+        :param: x1 PE1
+        :param: x2 PE2
+        :param: x3 PE3
+        :param: x4 PE4
         """
-        Measure = np.array([self.reorder_P0[N], self.reorder_P1[N], self.reorder_P2[N], self.reorder_P3[N]])
-        template_N = np.array([self.Pt_0, self.Pt_1, self.Pt_2, self.Pt_3])
-        self.R, self.t = kabsch(Measure, template_N)
+
         # 将参数转换成tensor类型
         x1 = torch.tensor(x1)
         x2 = torch.tensor(x2)
@@ -351,28 +333,35 @@ class template:
             J[j * 3 + 2][j * 3] = J_np[j][j * 9 + 6]
             J[j * 3 + 2][j * 3 + 1] = J_np[j][j * 9 + 7]
             J[j * 3 + 2][j * 3 + 2] = J_np[j][j * 9 + 8]
+        # 将之前的tensor类型转换回numpy类型
+        self.R = self.R.numpy()
+        self.t = self.t.numpy()
+
         return J
 
-    # def gradient(self, alpha, epoch):
-    #     """
-    #     description:
-    #     计算梯度值
-    #
-    #     :param:
-    #     alpha:步长
-    #     epoch:迭代次数
-    #
-    #     :return:
-    #     """
-
-    def Template_opt(self):
+    def Template_opt(self, alpha, epoch, x1, x2, x3, x4):
         """
         description:
         梯度下降主函数
-
-        :return:
+        :param: alpha 步长
+        :param: epoch 遍历次数
+        :return:包含参数[a,b,c,d,e,f]最优参数的矩阵
         """
-        pass
+
+        theta = 1000
+        Jacobian = self.jacobian_matrix(self.loss_function, x1, x2, x3, x4)
+        E_theta = []
+        for i in range(epoch):
+            self.Matrix_RT(i)
+            loss = self.loss_function(x1, x2, x3, x4)  # 得到元组构成的loss
+
+            for j in range(len(loss)):
+                E_theta.append(loss[j])
+            E_theta = np.array(E_theta)
+            E_theta = E_theta.reshape(1,12)
+            theta = theta - alpha * E_theta @ Jacobian
+
+        return theta
 
     def Template_total(self):
         """
