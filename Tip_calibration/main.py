@@ -49,8 +49,9 @@ if __name__ == '__main__':
     pe4 = template.T[3]
     # loss = test.loss_function(pe1, pe2, pe3, pe4)
     # print(loss)
-    test.Matrix_RT(1)
-    f = test.loss_function(pe1, pe2, pe3, pe4)
+    # test.Matrix_RT(1)
+    # f = test.loss_function(pe1, pe2, pe3, pe4)
     # J = test.jacobian_matrix(test.loss_function, pe1, pe2, pe3, pe4)
-    t_value = test.Template_opt(0.01, 1, pe1, pe2, pe3, pe4)
-    print(t_value)
+    # t_value = test.Template_opt(1e-5, 5, pe1, pe2, pe3, pe4)
+    # print(t_value)
+    test.Template_total()

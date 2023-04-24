@@ -2,11 +2,9 @@ import numpy as np
 import math
 import scipy
 import torch
-from sympy import symbols, diff, Matrix
 from Others.kabsch import kabsch
 # 尝试利用pytorch方法解决雅可比矩阵问题
 from torch.autograd.functional import jacobian
-from torch import tensor
 
 
 class template:
@@ -254,25 +252,91 @@ class template:
 
         return temp
 
+    def isRotationMatrix(self, R):
+        """
+        description:
+            检查输入的矩阵是否符合欧拉角的条件。
+        :param R: 旋转矩阵
+        :return: n
+        """
+        Rt = np.transpose(R)
+        shouldBeIdentity = np.dot(Rt, R)
+        I = np.identity(3, dtype=R.dtype)
+        n = np.linalg.norm(I - shouldBeIdentity)
+        return n < 1e-6
+
+    # Calculates rotation matrix to euler angles
+    # The result is the same as MATLAB except the order
+    # of the euler angles ( x and z are swapped ).
+    def rotationMatrixToEulerAngles(self, R):
+        """
+        description:
+            将旋转矩阵转换成欧拉角
+        :param R: 旋转矩阵
+        :return:角度值 - x,y,z
+        """
+        assert (self.isRotationMatrix(R))
+
+        sy = math.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
+
+        singular = sy < 1e-6
+
+        if not singular:
+            x = math.atan2(R[2, 1], R[2, 2])
+            y = math.atan2(-R[2, 0], sy)
+            z = math.atan2(R[1, 0], R[0, 0])
+        else:
+            x = math.atan2(-R[1, 2], R[1, 1])
+            y = math.atan2(-R[2, 0], sy)
+            z = 0
+
+        return np.array([x, y, z])
+
+    def eulerAnglesToRotationMatrix(self, theta):
+        """
+        description:
+            将欧拉角转换成旋转矩阵
+        :param: theta: [x,y,z]
+        :return: R: shape(3,3) 旋转矩阵
+        """
+        R_x = np.array([[1, 0, 0],
+                        [0, math.cos(theta[0]), -math.sin(theta[0])],
+                        [0, math.sin(theta[0]), math.cos(theta[0])]
+                        ])
+
+        R_y = np.array([[math.cos(theta[1]), 0, math.sin(theta[1])],
+                        [0, 1, 0],
+                        [-math.sin(theta[1]), 0, math.cos(theta[1])]
+                        ])
+
+        R_z = np.array([[math.cos(theta[2]), -math.sin(theta[2]), 0],
+                        [math.sin(theta[2]), math.cos(theta[2]), 0],
+                        [0, 0, 1]
+                        ])
+
+        R = np.dot(R_z, np.dot(R_y, R_x))
+
+        return R
+
     def Matrix_RT(self, N):
         """
         description:
             计算初始模板坐标系和测量数据的平移旋转矩阵
-        :param N: the N frame measure data
+        :param N: 第N组测量数据
         :return:NONE
         """
         Measure = np.array([self.reorder_P0[N], self.reorder_P1[N], self.reorder_P2[N], self.reorder_P3[N]])
         template_N = np.array([self.Pt_0, self.Pt_1, self.Pt_2, self.Pt_3])
         self.R, self.t = kabsch(Measure, template_N)
 
-    def loss_function(self, x1, x2, x3, x4):
+    def cost_function(self, x1, x2, x3, x4):
         """
         description:
             损失函数本体表达
-        :param x1: PE1
-        :param x2: PE2
-        :param x3: PE3
-        :param x4: PE4
+        :param x1: PE1-模板坐标系对应的第一个小球坐标
+        :param x2: PE2-模板坐标系对应的第二个小球坐标
+        :param x3: PE3-模板坐标系对应的第三个小球坐标
+        :param x4: PE4-模板坐标系对应的第四个小球坐标
 
         :return: type:tuple
         """
@@ -284,10 +348,10 @@ class template:
         description：
             利用torch包计算梯度下降优化中的雅可比矩阵
         :param: function: loss函数
-        :param: x1 PE1
-        :param: x2 PE2
-        :param: x3 PE3
-        :param: x4 PE4
+        :param x1: PE1-模板坐标系对应的第一个小球坐标
+        :param x2: PE2-模板坐标系对应的第二个小球坐标
+        :param x3: PE3-模板坐标系对应的第三个小球坐标
+        :param x4: PE4-模板坐标系对应的第四个小球坐标
         """
 
         # 将参数转换成tensor类型
@@ -349,16 +413,16 @@ class template:
         """
 
         theta = 1000
-        Jacobian = self.jacobian_matrix(self.loss_function, x1, x2, x3, x4)
+        Jacobian = self.jacobian_matrix(self.cost_function, x1, x2, x3, x4)
         E_theta = []
         for i in range(epoch):
             self.Matrix_RT(i)
-            loss = self.loss_function(x1, x2, x3, x4)  # 得到元组构成的loss
+            loss = self.cost_function(x1, x2, x3, x4)  # 得到元组构成的loss
 
             for j in range(len(loss)):
                 E_theta.append(loss[j])
             E_theta = np.array(E_theta)
-            E_theta = E_theta.reshape(1,12)
+            E_theta = E_theta.reshape(1, 12)
             theta = theta - alpha * E_theta @ Jacobian
 
         return theta
@@ -370,3 +434,9 @@ class template:
         :param:
         :return:
         """
+        j = []
+        loss = []
+        for i in range(1, self.Fig_N):
+            self.Matrix_RT(i)
+            loss.append(self.cost_function(self.Pt_0, self.Pt_1, self.Pt_2, self.Pt_3))
+        print(loss)
