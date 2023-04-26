@@ -7,13 +7,79 @@ from Others.kabsch import kabsch
 from torch.autograd.functional import jacobian
 
 
+def isRotationMatrix(R):
+    """
+    description:
+        检查输入的矩阵是否符合欧拉角的条件。
+    :param R: 旋转矩阵
+    :return: n
+    """
+    Rt = np.transpose(R)
+    shouldBeIdentity = np.dot(Rt, R)
+    I = np.identity(3, dtype=R.dtype)
+    n = np.linalg.norm(I - shouldBeIdentity)
+    return n < 1e-6
+
+
+def rotationMatrixToEulerAngles(R):
+    """
+    description:
+        将旋转矩阵转换成欧拉角（弧度），除了排列顺序之外（x和z的顺序），结果和matlab的一致
+    :param R: 旋转矩阵
+    :return:角度值 - x,y,z
+    """
+    assert (isRotationMatrix(R))
+
+    sy = math.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
+
+    singular = sy < 1e-6
+
+    if not singular:
+        x = math.atan2(R[2, 1], R[2, 2])
+        y = math.atan2(-R[2, 0], sy)
+        z = math.atan2(R[1, 0], R[0, 0])
+    else:
+        x = math.atan2(-R[1, 2], R[1, 1])
+        y = math.atan2(-R[2, 0], sy)
+        z = 0
+
+    return np.array([x, y, z])
+
+
+def eulerAnglesToRotationMatrix(alpha, beta, gamma):
+    """
+    description:
+        将欧拉角转换成旋转矩阵
+    :param: theta: [x,y,z]
+    :return: R: shape(3,3) 旋转矩阵 type:numpy.ndarray
+    """
+    R_x = np.array([[1, 0, 0],
+                    [0, math.cos(alpha), -math.sin(alpha)],
+                    [0, math.sin(alpha), math.cos(alpha)]
+                    ])
+
+    R_y = np.array([[math.cos(beta), 0, math.sin(beta)],
+                    [0, 1, 0],
+                    [-math.sin(beta), 0, math.cos(beta)]
+                    ])
+
+    R_z = np.array([[math.cos(gamma), -math.sin(gamma), 0],
+                    [math.sin(gamma), math.cos(gamma), 0],
+                    [0, 0, 1]
+                    ])
+
+    R = np.dot(R_z, np.dot(R_y, R_x))
+
+    return R
+
+
 class template:
     """
     description:
         建造针尖模板坐标系。
     """
 
-    def __init__(self, measure3d, degree=1, lr=0.01, num_iter=1000):
+    def __init__(self, measure3d):
         """
         description:
         初始化
@@ -25,39 +91,41 @@ class template:
         self.P1 = measure3d[:, :, 1]
         self.P2 = measure3d[:, :, 2]
         self.P3 = measure3d[:, :, 3]
+
         # 采集数据的张数
         self.Fig_N = len(measure3d)
 
         # 排序之后的小球数据
-        self.reorder_P0 = 0
-        self.reorder_P1 = 0
-        self.reorder_P2 = 0
-        self.reorder_P3 = 0
+        self.reorder_P0 = None
+        self.reorder_P1 = None
+        self.reorder_P2 = None
+        self.reorder_P3 = None
 
         # 模板坐标系Pt各点坐标
-        self.Pt_0 = 0
-        self.Pt_1 = 0
-        self.Pt_2 = 0
-        self.Pt_3 = 0
+        self.Pt_0 = None
+        self.Pt_1 = None
+        self.Pt_2 = None
+        self.Pt_3 = None
 
         # 制作模板时候使用的flag
         self.p_flag = [0, 0, 0, 0]
 
         # RT旋转平移矩阵temp
-        self.R = 0
-        self.t = 0
-
-        # 梯度下降相关函数
-        self.degree = degree
-        self.lr = lr
-        self.num_iter = num_iter
-        self.theta = None
+        self.R = []
+        self.t = []
+        # 欧拉角(由旋转矩阵转换而来)
+        self.alpha = None
+        self.beta = None
+        self.gamma = None
+        # 平移向量
+        self.T1 = None
+        self.T2 = None
+        self.T3 = None
 
     def xyz(self, P):
         """
         description:
             拆开每个点的三维值
-
         """
         P_x = P[0]
         P_y = P[1]
@@ -135,7 +203,6 @@ class template:
         description:
             对收集到的小球数按照模板要求重新排序。
 
-        :return: no
         """
 
         p = [0, 0, 0, 0]
@@ -192,7 +259,7 @@ class template:
                 continue
             self.reorder_P3 = p[i]
 
-        print("Template has ordered.")
+        print("Balls has ordered.")
 
     def Template_initBuild(self, N):
         """
@@ -205,7 +272,7 @@ class template:
             reorder 3Dimension Matrix Group p , P=[p_0,p_1,p_2,p_3] each Group
             N：the N frames.
         :return:
-            temp
+            shape为(3,4)的初始化模板坐标系矩阵
         """
 
         # a = self.distance_ab(self.P0[0], self.P1[0])
@@ -252,98 +319,120 @@ class template:
 
         return temp
 
-    def isRotationMatrix(self, R):
+    def Matrix_RT_Conversion(self, N):
         """
         description:
-            检查输入的矩阵是否符合欧拉角的条件。
-        :param R: 旋转矩阵
-        :return: n
-        """
-        Rt = np.transpose(R)
-        shouldBeIdentity = np.dot(Rt, R)
-        I = np.identity(3, dtype=R.dtype)
-        n = np.linalg.norm(I - shouldBeIdentity)
-        return n < 1e-6
-
-    # Calculates rotation matrix to euler angles
-    # The result is the same as MATLAB except the order
-    # of the euler angles ( x and z are swapped ).
-    def rotationMatrixToEulerAngles(self, R):
-        """
-        description:
-            将旋转矩阵转换成欧拉角
-        :param R: 旋转矩阵
-        :return:角度值 - x,y,z
-        """
-        assert (self.isRotationMatrix(R))
-
-        sy = math.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
-
-        singular = sy < 1e-6
-
-        if not singular:
-            x = math.atan2(R[2, 1], R[2, 2])
-            y = math.atan2(-R[2, 0], sy)
-            z = math.atan2(R[1, 0], R[0, 0])
-        else:
-            x = math.atan2(-R[1, 2], R[1, 1])
-            y = math.atan2(-R[2, 0], sy)
-            z = 0
-
-        return np.array([x, y, z])
-
-    def eulerAnglesToRotationMatrix(self, theta):
-        """
-        description:
-            将欧拉角转换成旋转矩阵
-        :param: theta: [x,y,z]
-        :return: R: shape(3,3) 旋转矩阵
-        """
-        R_x = np.array([[1, 0, 0],
-                        [0, math.cos(theta[0]), -math.sin(theta[0])],
-                        [0, math.sin(theta[0]), math.cos(theta[0])]
-                        ])
-
-        R_y = np.array([[math.cos(theta[1]), 0, math.sin(theta[1])],
-                        [0, 1, 0],
-                        [-math.sin(theta[1]), 0, math.cos(theta[1])]
-                        ])
-
-        R_z = np.array([[math.cos(theta[2]), -math.sin(theta[2]), 0],
-                        [math.sin(theta[2]), math.cos(theta[2]), 0],
-                        [0, 0, 1]
-                        ])
-
-        R = np.dot(R_z, np.dot(R_y, R_x))
-
-        return R
-
-    def Matrix_RT(self, N):
-        """
-        description:
-            计算初始模板坐标系和测量数据的平移旋转矩阵
+            利用kabsch函数计算初始模板坐标系和测量数据的平移旋转矩阵,将旋转矩阵转换成欧拉角（弧度制），
+            再用xyz函数分别拆成单独的欧拉角和平移值
         :param N: 第N组测量数据
-        :return:NONE
+        :return: 3个欧拉角，3个平移值
         """
         Measure = np.array([self.reorder_P0[N], self.reorder_P1[N], self.reorder_P2[N], self.reorder_P3[N]])
         template_N = np.array([self.Pt_0, self.Pt_1, self.Pt_2, self.Pt_3])
-        self.R, self.t = kabsch(Measure, template_N)
+        R, t = kabsch(Measure, template_N)
+        alpha, beta, gamma = self.xyz(rotationMatrixToEulerAngles(R))
+        T1, T2, T3 = self.xyz(t)
+        return alpha, beta, gamma, T1, T2, T3  # 正常使用
+        # return R, t, alpha, beta, gamma, T1, T2, T3  # test用
 
-    def cost_function(self, x1, x2, x3, x4):
+    def theta_Dataproc(self):
+        """
+
+        :return:
+        """
+        N = self.Fig_N
+        alpha = np.zeros((N, 1))
+        beta = np.zeros((N, 1))
+        gamma = np.zeros((N, 1))
+        T1 = np.zeros((N, 1))
+        T2 = np.zeros((N, 1))
+        T3 = np.zeros((N, 1))
+        for i in range(N):
+            alpha[i], beta[i], gamma[i], T1[i], T2[i], T3[i] = self.Matrix_RT_Conversion(i)
+        # 将整理好的所需数据塞入私有
+        self.alpha = alpha
+        self.beta = beta
+        self.gamma = gamma
+        self.T1 = T1
+        self.T2 = T2
+        self.T3 = T3
+
+        return alpha, beta, gamma, T1, T2, T3
+
+    def cost_function(self, a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3):
         """
         description:
-            损失函数本体表达
-        :param x1: PE1-模板坐标系对应的第一个小球坐标
-        :param x2: PE2-模板坐标系对应的第二个小球坐标
-        :param x3: PE3-模板坐标系对应的第三个小球坐标
-        :param x4: PE4-模板坐标系对应的第四个小球坐标
-
+            梯度下降优化里的损失函数
+        :param f:
+        :param e:
+        :param d:
+        :param c:
+        :param b:
+        :param a:
+        :param alpha: 欧拉角alpha
+        :param beta: 欧拉角beta
+        :param gamma: 欧拉角theta
+        :param T1:平移向量1
+        :param T2:平移向量2
+        :param T3:平移向量3
         :return: type:tuple
         """
+        Pe1 = np.zeros((3, 1))
+        Pe2 = np.zeros((3, 1))
+        Pe3 = np.zeros((3, 1))
+        Pe4 = np.zeros((3, 1))
 
-        return self.R @ x1 + self.t, self.R @ x2 + self.t, self.R @ x3 + self.t, self.R @ x4 + self.t
+        Pe2[0][0] = a
+        Pe3[0][0] = b
+        Pe3[1][0] = c
+        Pe4[0][0] = d
+        Pe4[1][0] = e
+        Pe4[2][0] = f
+        # print(Pe1, Pe2, Pe3, Pe4)
+        # 获取数据的大小
+        N = self.Fig_N
 
-    def jacobian_matrix(self, func, x1, x2, x3, x4):
+        # 将欧拉角转换成旋转矩阵
+        for i in range(N):
+            R_temp = eulerAnglesToRotationMatrix(alpha[i], beta[i], gamma[i])
+            self.R.append(R_temp)
+            self.t.append(T1[i])
+            self.t.append(T2[i])
+            self.t.append(T3[i])
+        self.R = np.array(self.R).reshape(3 * N, 3)
+        self.t = np.array(self.t)
+
+        p0 = self.reorder_P0.copy().reshape(3 * N, 1)
+        p1 = self.reorder_P1.copy().reshape(3 * N, 1)
+        p2 = self.reorder_P2.copy().reshape(3 * N, 1)
+        p3 = self.reorder_P3.copy().reshape(3 * N, 1)
+
+        E_1 = self.R @ Pe1 + self.t - p0
+        E_2 = self.R @ Pe2 + self.t - p1
+        E_3 = self.R @ Pe3 + self.t - p2
+        E_4 = self.R @ Pe4 + self.t - p3
+
+        E = np.zeros((N * 12, 1))
+
+        for i in range(N):
+            E[i * 12] = E_1[i * 3]
+            E[i * 12 + 1] = E_1[i * 3 + 1]
+            E[i * 12 + 2] = E_1[i * 3 + 2]
+            E[i * 12 + 3] = E_2[i * 3]
+            E[i * 12 + 4] = E_2[i * 3 + 1]
+            E[i * 12 + 5] = E_2[i * 3 + 2]
+            E[i * 12 + 6] = E_3[i * 3]
+            E[i * 12 + 7] = E_3[i * 3 + 1]
+            E[i * 12 + 8] = E_3[i * 3 + 2]
+            E[i * 12 + 9] = E_4[i * 3]
+            E[i * 12 + 10] = E_4[i * 3 + 1]
+            E[i * 12 + 11] = E_4[i * 3 + 2]
+
+        return np.linalg.norm(E)
+
+        # return self.R @ x1 + self.t, self.R @ x2 + self.t, self.R @ x3 + self.t, self.R @ x4 + self.t
+
+    def jacobian_matrix(self):
         """
         description：
             利用torch包计算梯度下降优化中的雅可比矩阵
@@ -355,13 +444,32 @@ class template:
         """
 
         # 将参数转换成tensor类型
-        x1 = torch.tensor(x1)
-        x2 = torch.tensor(x2)
-        x3 = torch.tensor(x3)
-        x4 = torch.tensor(x4)
-        self.R = torch.tensor(self.R)
-        self.t = torch.tensor(self.t)
-        J_torch = jacobian(func, (x1, x2, x3, x4))
+        a = self.Pt_1[0].copy()
+        b = self.Pt_2[0].copy()
+        c = self.Pt_2[1].copy()
+        d = self.Pt_3[0].copy()
+        e = self.Pt_3[1].copy()
+        f = self.Pt_3[2].copy()
+
+        a = torch.tensor(a)
+        b = torch.tensor(b)
+        c = torch.tensor(c)
+        d = torch.tensor(d)
+        e = torch.tensor(e)
+        f = torch.tensor(f)
+        # self.R = torch.tensor(self.R)
+        # self.t = torch.tensor(self.t)
+        self.alpha = torch.tensor(self.alpha)
+        self.beta = torch.tensor(self.beta)
+        self.gamma = torch.tensor(self.gamma)
+        self.T1 = torch.tensor(self.T1)
+        self.T2 = torch.tensor(self.T2)
+        self.T3 = torch.tensor(self.T3)
+
+        # J_torch = jacobian(func, (x1, x2, x3, x4))
+        J_torch = jacobian(self.cost_function,
+                           (a, b, c, d, e, f, self.alpha, self.beta, self.gamma, self.T1, self.T2, self.T3))
+
         dn1 = len(J_torch)
         dn2 = len(J_torch[1])
 
@@ -416,7 +524,7 @@ class template:
         Jacobian = self.jacobian_matrix(self.cost_function, x1, x2, x3, x4)
         E_theta = []
         for i in range(epoch):
-            self.Matrix_RT(i)
+            self.Matrix_RT_Conversion(i)
             loss = self.cost_function(x1, x2, x3, x4)  # 得到元组构成的loss
 
             for j in range(len(loss)):
@@ -437,6 +545,6 @@ class template:
         j = []
         loss = []
         for i in range(1, self.Fig_N):
-            self.Matrix_RT(i)
+            self.Matrix_RT_Conversion(i)
             loss.append(self.cost_function(self.Pt_0, self.Pt_1, self.Pt_2, self.Pt_3))
         print(loss)
