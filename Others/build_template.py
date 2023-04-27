@@ -469,7 +469,7 @@ class template:
         # loss = np.linalg.norm(E)
         # loss = torch.tensor(loss)
 
-        print(E)
+        # print(E)
         return E
 
     # return self.R @ x1 + self.t, self.R @ x2 + self.t, self.R @ x3 + self.t, self.R @ x4 + self.t

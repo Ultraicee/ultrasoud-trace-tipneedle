@@ -62,7 +62,7 @@ if __name__ == '__main__':
         temp = temp.reshape(1, 9)
         big_R[i] = temp
     big_R = big_R.reshape((N * 3, 3))
-    print(big_R)
+    # print(big_R)
 
     # dddddd = test.cost_function(a, b, c, d, e, f, a1, a2, a3, a4, a5, a6)
     asdfasdf = test.jacobian_matrix()
