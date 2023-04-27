@@ -371,42 +371,41 @@ class template:
         :param a:
         :param alpha: 欧拉角alpha
         :param beta: 欧拉角beta
-        :param gamma: 欧拉角theta
+        :param gamma: 欧拉角gamma
         :param T1:平移向量1
         :param T2:平移向量2
         :param T3:平移向量3
         :return: type:tuple
         """
-        Pe1 = np.zeros((3, 1))
-        Pe2 = np.zeros((3, 1))
-        Pe3 = np.zeros((3, 1))
-        Pe4 = np.zeros((3, 1))
+        # Pe1 = np.zeros((3, 1))
+        # Pe2 = np.zeros((3, 1))
+        # Pe3 = np.zeros((3, 1))
+        # Pe4 = np.zeros((3, 1))
 
         # 因为torch的拼接问题，先将3个平移向量重新转回numpy的格式
-        T1 = T1.detach().numpy()
-        T2 = T2.detach().numpy()
-        T3 = T3.detach().numpy()
+        # T1 = T1.detach().numpy()
+        # T2 = T2.detach().numpy()
+        # T3 = T3.detach().numpy()
 
-
-        Pe2[0][0] = a
-        Pe3[0][0] = b
-        Pe3[1][0] = c
-        Pe4[0][0] = d
-        Pe4[1][0] = e
-        Pe4[2][0] = f
+        # Pe2[0][0] = a
+        # Pe3[0][0] = b
+        # Pe3[1][0] = c
+        # Pe4[0][0] = d
+        # Pe4[1][0] = e
+        # Pe4[2][0] = f
         # print(Pe1, Pe2, Pe3, Pe4)
         # 获取数据的大小
         N = self.Fig_N
 
         # 将欧拉角转换成旋转矩阵
-        for i in range(N):
-            R_temp = eulerAnglesToRotationMatrix(alpha[i], beta[i], gamma[i])
-            self.R.append(R_temp)
-            self.t.append(T1[i])
-            self.t.append(T2[i])
-            self.t.append(T3[i])
-        self.R = np.array(self.R).reshape(3 * N, 3)
-        self.t = np.array(self.t)
+        # for i in range(N):
+        #     R_temp = eulerAnglesToRotationMatrix(alpha[i], beta[i], gamma[i])
+        #     self.R.append(R_temp)
+        #     self.t.append(T1[i])
+        #     self.t.append(T2[i])
+        #     self.t.append(T3[i])
+        # self.R = np.array(self.R).reshape(3 * N, 3)
+        # self.t = np.array(self.t)
         # self.t = torch.cat(self.t,dim=0)
 
         p0 = self.reorder_P0.copy().reshape(3 * N, 1)
@@ -414,46 +413,66 @@ class template:
         p2 = self.reorder_P2.copy().reshape(3 * N, 1)
         p3 = self.reorder_P3.copy().reshape(3 * N, 1)
 
-        self.R = torch.tensor(self.R)
-        self.t = torch.tensor(self.t)
-        Pe1 = torch.tensor(Pe1)
-        Pe2 = torch.tensor(Pe2)
-        Pe3 = torch.tensor(Pe3)
-        Pe4 = torch.tensor(Pe4)
+        # self.R = torch.tensor(self.R)
+        # self.t = torch.tensor(self.t)
+        # Pe1 = torch.tensor(Pe1)
+        # Pe2 = torch.tensor(Pe2)
+        # Pe3 = torch.tensor(Pe3)
+        # Pe4 = torch.tensor(Pe4)
         p0 = torch.tensor(p0)
         p1 = torch.tensor(p1)
         p2 = torch.tensor(p2)
         p3 = torch.tensor(p3)
 
-        E_1 = self.R @ Pe1 + self.t - p0
-        E_2 = self.R @ Pe2 + self.t - p1
-        E_3 = self.R @ Pe3 + self.t - p2
-        E_4 = self.R @ Pe4 + self.t - p3
+        # E_1 = self.R @ Pe1 + self.t - p0
+        # E_2 = self.R @ Pe2 + self.t - p1
+        # E_3 = self.R @ Pe3 + self.t - p2
+        # E_4 = self.R @ Pe4 + self.t - p3
 
         E = torch.zeros(N * 12, 1)
 
         for i in range(N):
-            E[i * 12] = E_1[i * 3]
-            E[i * 12 + 1] = E_1[i * 3 + 1]
-            E[i * 12 + 2] = E_1[i * 3 + 2]
-            E[i * 12 + 3] = E_2[i * 3]
-            E[i * 12 + 4] = E_2[i * 3 + 1]
-            E[i * 12 + 5] = E_2[i * 3 + 2]
-            E[i * 12 + 6] = E_3[i * 3]
-            E[i * 12 + 7] = E_3[i * 3 + 1]
-            E[i * 12 + 8] = E_3[i * 3 + 2]
-            E[i * 12 + 9] = E_4[i * 3]
-            E[i * 12 + 10] = E_4[i * 3 + 1]
-            E[i * 12 + 11] = E_4[i * 3 + 2]
+            E[i * 12] = self.T1[i] - p0[i * 3]
+            E[i * 12 + 1] = self.T2[i] - p0[i * 3 + 1]
+            E[i * 12 + 2] = self.T3[i] - p0[i * 3 + 2]
+
+            E[i * 12 + 3] = self.T1[i] - p1[i * 3] + a * math.cos(alpha[i]) * math.cos(beta[i])
+            E[i * 12 + 4] = self.T2[i] - p1[i * 3 + 1] - a * (
+                    math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(alpha[i]) * math.sin(beta[i]) * math.sin(
+                gamma[i]))
+            E[i * 12 + 5] = self.T3[i] - p1[i * 3 + 2] + a * (
+                    math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(gamma[i]) * math.sin(
+                beta[i]))
+
+            E[i * 12 + 6] = self.T1[i] - p2[i * 3] + b * math.cos(alpha[i]) * math.cos(beta[i]) + c * math.cos(
+                beta[i]) * math.sin(alpha[i])
+            E[i * 12 + 7] = self.T2[i] - p2[i * 3 + 1] - b * (
+                    math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(beta[i]) * math.sin(beta[i]) * math.sin(
+                gamma[i])) + c * (math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(alpha[i]) * math.sin(
+                beta[i]) * math.sin(gamma[i]))
+            E[i * 12 + 8] = self.T3[i] - p2[i * 3 + 2] + b * (
+                    math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(gamma[i]) * math.sin(
+                beta[i])) - c * (math.cos(alpha[i]) * math.sin(gamma[i]) - math.cos(gamma[i]) * math.sin(
+                alpha[i]) * math.sin(beta[i]))
+
+            E[i * 12 + 9] = self.T1[i] - p3[i * 3] - f * math.sin(beta[i]) + d * math.cos(alpha[i]) * math.cos(
+                beta[i]) + e * math.cos(beta[i]) * math.sin(alpha[i])
+            E[i * 12 + 10] = self.T2[i] - p3[i * 3 + 1] - d * (
+                        math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(alpha[i]) * math.sin(beta[i]) * math.sin(
+                    gamma[i])) + e * (math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(alpha[i]) * math.sin(
+                beta[i]) * math.sin(gamma[i])) + f * math.cos(beta[i]) * math.sin(gamma[i])
+            E[i * 12 + 11] = self.T3[i] - p3[i * 3 + 2] + d * (
+                    math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(gamma[i]) * math.sin(
+                beta[i])) - e * (math.cos(alpha[i]) * math.sin(gamma[i]) - math.cos(gamma[i]) * math.sin(
+                alpha[i]) * math.sin(beta[i])) + f * math.cos(beta[i]) * math.cos(gamma[i])
 
         # loss = np.linalg.norm(E)
         # loss = torch.tensor(loss)
-        print(E.shape)
-        E1 = E.detach().numpy()
-        print(E1)
+
+        print(E)
         return E
 
-        # return self.R @ x1 + self.t, self.R @ x2 + self.t, self.R @ x3 + self.t, self.R @ x4 + self.t
+    # return self.R @ x1 + self.t, self.R @ x2 + self.t, self.R @ x3 + self.t, self.R @ x4 + self.t
 
     def jacobian_matrix(self):
         """
@@ -496,43 +515,43 @@ class template:
         dn1 = len(J_torch)
         dn2 = len(J_torch[1])
 
-        J_np = np.zeros((dn1, dn2 * 9))
-        # 将torch计算后得到的雅可比矩阵转换成numpy格式(shape(4,36)),并从shape(4,36)->(12,12)
-        for i in range(len(J_torch)):
-            for j in range(len(J_torch[i])):
-                temp = J_torch[j][i]
-                temp = temp.numpy()
-                temp = temp.reshape(1, 9)
+        # J_np = np.zeros((dn1, dn2 * 9))
+        # # 将torch计算后得到的雅可比矩阵转换成numpy格式(shape(4,36)),并从shape(4,36)->(12,12)
+        # for i in range(len(J_torch)):
+        #     for j in range(len(J_torch[i])):
+        #         temp = J_torch[j][i]
+        #         temp = temp.numpy()
+        #         temp = temp.reshape(1, 9)
+        #
+        #         J_np[i][j * 9] = temp[0][0]
+        #         J_np[i][j * 9 + 1] = temp[0][1]
+        #         J_np[i][j * 9 + 2] = temp[0][2]
+        #         J_np[i][j * 9 + 3] = temp[0][3]
+        #         J_np[i][j * 9 + 4] = temp[0][4]
+        #         J_np[i][j * 9 + 5] = temp[0][5]
+        #         J_np[i][j * 9 + 6] = temp[0][6]
+        #         J_np[i][j * 9 + 7] = temp[0][7]
+        #         J_np[i][j * 9 + 8] = temp[0][8]
+        #
+        # # 重新建立一个矩阵按照需要的格式填入J_np里的数据
+        # # shape(12,12)
+        # J = np.zeros((12, 12))
+        # for j in range(4):
+        #     # for i in range(3):
+        #     J[j * 3][j * 3] = J_np[j][j * 9]
+        #     J[j * 3][j * 3 + 1] = J_np[j][j * 9 + 1]
+        #     J[j * 3][j * 3 + 2] = J_np[j][j * 9 + 2]
+        #     J[j * 3 + 1][j * 3] = J_np[j][j * 9 + 3]
+        #     J[j * 3 + 1][j * 3 + 1] = J_np[j][j * 9 + 4]
+        #     J[j * 3 + 1][j * 3 + 2] = J_np[j][j * 9 + 5]
+        #     J[j * 3 + 2][j * 3] = J_np[j][j * 9 + 6]
+        #     J[j * 3 + 2][j * 3 + 1] = J_np[j][j * 9 + 7]
+        #     J[j * 3 + 2][j * 3 + 2] = J_np[j][j * 9 + 8]
+        # # 将之前的tensor类型转换回numpy类型
+        # self.R = self.R.numpy()
+        # self.t = self.t.numpy()
 
-                J_np[i][j * 9] = temp[0][0]
-                J_np[i][j * 9 + 1] = temp[0][1]
-                J_np[i][j * 9 + 2] = temp[0][2]
-                J_np[i][j * 9 + 3] = temp[0][3]
-                J_np[i][j * 9 + 4] = temp[0][4]
-                J_np[i][j * 9 + 5] = temp[0][5]
-                J_np[i][j * 9 + 6] = temp[0][6]
-                J_np[i][j * 9 + 7] = temp[0][7]
-                J_np[i][j * 9 + 8] = temp[0][8]
-
-        # 重新建立一个矩阵按照需要的格式填入J_np里的数据
-        # shape(12,12)
-        J = np.zeros((12, 12))
-        for j in range(4):
-            # for i in range(3):
-            J[j * 3][j * 3] = J_np[j][j * 9]
-            J[j * 3][j * 3 + 1] = J_np[j][j * 9 + 1]
-            J[j * 3][j * 3 + 2] = J_np[j][j * 9 + 2]
-            J[j * 3 + 1][j * 3] = J_np[j][j * 9 + 3]
-            J[j * 3 + 1][j * 3 + 1] = J_np[j][j * 9 + 4]
-            J[j * 3 + 1][j * 3 + 2] = J_np[j][j * 9 + 5]
-            J[j * 3 + 2][j * 3] = J_np[j][j * 9 + 6]
-            J[j * 3 + 2][j * 3 + 1] = J_np[j][j * 9 + 7]
-            J[j * 3 + 2][j * 3 + 2] = J_np[j][j * 9 + 8]
-        # 将之前的tensor类型转换回numpy类型
-        self.R = self.R.numpy()
-        self.t = self.t.numpy()
-
-        return J
+        return J_torch
 
     def Template_opt(self, alpha, epoch, x1, x2, x3, x4):
         """
