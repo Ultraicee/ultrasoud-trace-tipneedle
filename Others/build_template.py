@@ -382,6 +382,12 @@ class template:
         Pe3 = np.zeros((3, 1))
         Pe4 = np.zeros((3, 1))
 
+        # 因为torch的拼接问题，先将3个平移向量重新转回numpy的格式
+        T1 = T1.detach().numpy()
+        T2 = T2.detach().numpy()
+        T3 = T3.detach().numpy()
+
+
         Pe2[0][0] = a
         Pe3[0][0] = b
         Pe3[1][0] = c
@@ -401,18 +407,30 @@ class template:
             self.t.append(T3[i])
         self.R = np.array(self.R).reshape(3 * N, 3)
         self.t = np.array(self.t)
+        # self.t = torch.cat(self.t,dim=0)
 
         p0 = self.reorder_P0.copy().reshape(3 * N, 1)
         p1 = self.reorder_P1.copy().reshape(3 * N, 1)
         p2 = self.reorder_P2.copy().reshape(3 * N, 1)
         p3 = self.reorder_P3.copy().reshape(3 * N, 1)
 
+        self.R = torch.tensor(self.R)
+        self.t = torch.tensor(self.t)
+        Pe1 = torch.tensor(Pe1)
+        Pe2 = torch.tensor(Pe2)
+        Pe3 = torch.tensor(Pe3)
+        Pe4 = torch.tensor(Pe4)
+        p0 = torch.tensor(p0)
+        p1 = torch.tensor(p1)
+        p2 = torch.tensor(p2)
+        p3 = torch.tensor(p3)
+
         E_1 = self.R @ Pe1 + self.t - p0
         E_2 = self.R @ Pe2 + self.t - p1
         E_3 = self.R @ Pe3 + self.t - p2
         E_4 = self.R @ Pe4 + self.t - p3
 
-        E = np.zeros((N * 12, 1))
+        E = torch.zeros(N * 12, 1)
 
         for i in range(N):
             E[i * 12] = E_1[i * 3]
@@ -428,7 +446,12 @@ class template:
             E[i * 12 + 10] = E_4[i * 3 + 1]
             E[i * 12 + 11] = E_4[i * 3 + 2]
 
-        return np.linalg.norm(E)
+        # loss = np.linalg.norm(E)
+        # loss = torch.tensor(loss)
+        print(E.shape)
+        E1 = E.detach().numpy()
+        print(E1)
+        return E
 
         # return self.R @ x1 + self.t, self.R @ x2 + self.t, self.R @ x3 + self.t, self.R @ x4 + self.t
 
