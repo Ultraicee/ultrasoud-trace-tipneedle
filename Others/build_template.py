@@ -1,10 +1,16 @@
+import os
 import numpy as np
 import math
 import scipy
-import torch
-from Others.kabsch import kabsch
-# 尝试利用pytorch方法解决雅可比矩阵问题
+from Others.kabsch import kabsch  # 使用kabsch函数计算旋转平移矩阵
+# 尝试利用pytorch方法解决雅可比矩阵问题(弃用)
 from torch.autograd.functional import jacobian
+# 引入优化器相关库
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+from Others.yaml_create import yaml_handle
 
 
 def isRotationMatrix(R):
@@ -277,7 +283,7 @@ class template:
 
         # a = self.distance_ab(self.P0[0], self.P1[0])
         a = np.linalg.norm(abs(self.reorder_P0[N] - self.reorder_P1[N]), 2)
-        c = self.calp2line(self.reorder_P1[N], self.reorder_P0[N], self.reorder_P2[N])
+        c = self.calp2line(self.reorder_P0[N], self.reorder_P1[N], self.reorder_P2[N])
         b = math.sqrt(
             math.pow((np.linalg.norm(abs(self.reorder_P0[N] - self.reorder_P2[N]), 2)), 2) - math.pow(c, 2))
         # print(a, b, c)
@@ -338,7 +344,7 @@ class template:
     def theta_Dataproc(self):
         """
 
-        :return:
+        :return:待优化的12个参数（6个模板总使用的参数，3个欧拉角，3个平移向量）
         """
         N = self.Fig_N
         alpha = np.zeros((N, 1))
@@ -349,15 +355,36 @@ class template:
         T3 = np.zeros((N, 1))
         for i in range(N):
             alpha[i], beta[i], gamma[i], T1[i], T2[i], T3[i] = self.Matrix_RT_Conversion(i)
-        # 将整理好的所需数据塞入私有
-        self.alpha = alpha
-        self.beta = beta
-        self.gamma = gamma
-        self.T1 = T1
-        self.T2 = T2
-        self.T3 = T3
 
-        return alpha, beta, gamma, T1, T2, T3
+        a = self.Pt_1[0].copy()
+        b = self.Pt_2[0].copy()
+        c = self.Pt_2[1].copy()
+        d = self.Pt_3[0].copy()
+        e = self.Pt_3[1].copy()
+        f = self.Pt_3[2].copy()
+
+        # 将测量数据整合成（12*N，1）的格式，排列为[p1x,p1y,p1z,p2x,p2y,p2z,p3x,p3y,p3z,p4x,p4y,p4z..(循环N组)]
+        p0 = self.reorder_P0.copy().reshape(3 * N, 1)
+        p1 = self.reorder_P1.copy().reshape(3 * N, 1)
+        p2 = self.reorder_P2.copy().reshape(3 * N, 1)
+        p3 = self.reorder_P3.copy().reshape(3 * N, 1)
+        P_M = []
+        for i in range(N):
+            P_M.append(p0[i * 3])
+            P_M.append(p0[i * 3 + 1])
+            P_M.append(p0[i * 3 + 2])
+            P_M.append(p1[i * 3])
+            P_M.append(p1[i * 3 + 1])
+            P_M.append(p1[i * 3 + 2])
+            P_M.append(p2[i * 3])
+            P_M.append(p2[i * 3 + 1])
+            P_M.append(p2[i * 3 + 2])
+            P_M.append(p3[i * 3])
+            P_M.append(p3[i * 3 + 1])
+            P_M.append(p3[i * 3 + 2])
+        P_M = np.array(P_M).reshape(12 * N, 1)
+
+        return a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3, P_M
 
     def cost_function(self, a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3):
         """
@@ -377,99 +404,57 @@ class template:
         :param T3:平移向量3
         :return: type:tuple
         """
-        # Pe1 = np.zeros((3, 1))
-        # Pe2 = np.zeros((3, 1))
-        # Pe3 = np.zeros((3, 1))
-        # Pe4 = np.zeros((3, 1))
 
-        # 因为torch的拼接问题，先将3个平移向量重新转回numpy的格式
-        # T1 = T1.detach().numpy()
-        # T2 = T2.detach().numpy()
-        # T3 = T3.detach().numpy()
-
-        # Pe2[0][0] = a
-        # Pe3[0][0] = b
-        # Pe3[1][0] = c
-        # Pe4[0][0] = d
-        # Pe4[1][0] = e
-        # Pe4[2][0] = f
-        # print(Pe1, Pe2, Pe3, Pe4)
-        # 获取数据的大小
         N = self.Fig_N
-
-        # 将欧拉角转换成旋转矩阵
-        # for i in range(N):
-        #     R_temp = eulerAnglesToRotationMatrix(alpha[i], beta[i], gamma[i])
-        #     self.R.append(R_temp)
-        #     self.t.append(T1[i])
-        #     self.t.append(T2[i])
-        #     self.t.append(T3[i])
-        # self.R = np.array(self.R).reshape(3 * N, 3)
-        # self.t = np.array(self.t)
-        # self.t = torch.cat(self.t,dim=0)
 
         p0 = self.reorder_P0.copy().reshape(3 * N, 1)
         p1 = self.reorder_P1.copy().reshape(3 * N, 1)
         p2 = self.reorder_P2.copy().reshape(3 * N, 1)
         p3 = self.reorder_P3.copy().reshape(3 * N, 1)
 
-        # self.R = torch.tensor(self.R)
-        # self.t = torch.tensor(self.t)
-        # Pe1 = torch.tensor(Pe1)
-        # Pe2 = torch.tensor(Pe2)
-        # Pe3 = torch.tensor(Pe3)
-        # Pe4 = torch.tensor(Pe4)
         p0 = torch.tensor(p0)
         p1 = torch.tensor(p1)
         p2 = torch.tensor(p2)
         p3 = torch.tensor(p3)
 
-        # E_1 = self.R @ Pe1 + self.t - p0
-        # E_2 = self.R @ Pe2 + self.t - p1
-        # E_3 = self.R @ Pe3 + self.t - p2
-        # E_4 = self.R @ Pe4 + self.t - p3
-
         E = torch.zeros(N * 12, 1)
 
         for i in range(N):
-            E[i * 12] = self.T1[i] - p0[i * 3]
-            E[i * 12 + 1] = self.T2[i] - p0[i * 3 + 1]
-            E[i * 12 + 2] = self.T3[i] - p0[i * 3 + 2]
+            E[i * 12] = T1[i] - p0[i * 3]
+            E[i * 12 + 1] = T2[i] - p0[i * 3 + 1]
+            E[i * 12 + 2] = T3[i] - p0[i * 3 + 2]
 
-            E[i * 12 + 3] = self.T1[i] - p1[i * 3] + a * math.cos(alpha[i]) * math.cos(beta[i])
-            E[i * 12 + 4] = self.T2[i] - p1[i * 3 + 1] - a * (
+            E[i * 12 + 3] = T1[i] - p1[i * 3] + a * math.cos(alpha[i]) * math.cos(beta[i])
+            E[i * 12 + 4] = T2[i] - p1[i * 3 + 1] - a * (
                     math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(alpha[i]) * math.sin(beta[i]) * math.sin(
                 gamma[i]))
-            E[i * 12 + 5] = self.T3[i] - p1[i * 3 + 2] + a * (
+            E[i * 12 + 5] = T3[i] - p1[i * 3 + 2] + a * (
                     math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(gamma[i]) * math.sin(
                 beta[i]))
 
-            E[i * 12 + 6] = self.T1[i] - p2[i * 3] + b * math.cos(alpha[i]) * math.cos(beta[i]) + c * math.cos(
+            E[i * 12 + 6] = T1[i] - p2[i * 3] + b * math.cos(alpha[i]) * math.cos(beta[i]) + c * math.cos(
                 beta[i]) * math.sin(alpha[i])
-            E[i * 12 + 7] = self.T2[i] - p2[i * 3 + 1] - b * (
+            E[i * 12 + 7] = T2[i] - p2[i * 3 + 1] - b * (
                     math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(beta[i]) * math.sin(beta[i]) * math.sin(
                 gamma[i])) + c * (math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(alpha[i]) * math.sin(
                 beta[i]) * math.sin(gamma[i]))
-            E[i * 12 + 8] = self.T3[i] - p2[i * 3 + 2] + b * (
+            E[i * 12 + 8] = T3[i] - p2[i * 3 + 2] + b * (
                     math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(gamma[i]) * math.sin(
                 beta[i])) - c * (math.cos(alpha[i]) * math.sin(gamma[i]) - math.cos(gamma[i]) * math.sin(
                 alpha[i]) * math.sin(beta[i]))
 
-            E[i * 12 + 9] = self.T1[i] - p3[i * 3] - f * math.sin(beta[i]) + d * math.cos(alpha[i]) * math.cos(
+            E[i * 12 + 9] = T1[i] - p3[i * 3] - f * math.sin(beta[i]) + d * math.cos(alpha[i]) * math.cos(
                 beta[i]) + e * math.cos(beta[i]) * math.sin(alpha[i])
-            E[i * 12 + 10] = self.T2[i] - p3[i * 3 + 1] - d * (
-                        math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(alpha[i]) * math.sin(beta[i]) * math.sin(
-                    gamma[i])) + e * (math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(alpha[i]) * math.sin(
+            E[i * 12 + 10] = T2[i] - p3[i * 3 + 1] - d * (
+                    math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(alpha[i]) * math.sin(beta[i]) * math.sin(
+                gamma[i])) + e * (math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(alpha[i]) * math.sin(
                 beta[i]) * math.sin(gamma[i])) + f * math.cos(beta[i]) * math.sin(gamma[i])
-            E[i * 12 + 11] = self.T3[i] - p3[i * 3 + 2] + d * (
+            E[i * 12 + 11] = T3[i] - p3[i * 3 + 2] + d * (
                     math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(gamma[i]) * math.sin(
                 beta[i])) - e * (math.cos(alpha[i]) * math.sin(gamma[i]) - math.cos(gamma[i]) * math.sin(
                 alpha[i]) * math.sin(beta[i])) + f * math.cos(beta[i]) * math.cos(gamma[i])
 
-        # loss = np.linalg.norm(E)
-        # loss = torch.tensor(loss)
-
-        # print(E)
+        print(E)
         return E
 
     # return self.R @ x1 + self.t, self.R @ x2 + self.t, self.R @ x3 + self.t, self.R @ x4 + self.t
@@ -553,40 +538,217 @@ class template:
 
         return J_torch
 
-    def Template_opt(self, alpha, epoch, x1, x2, x3, x4):
-        """
-        description:
-        梯度下降主函数
-        :param: alpha 步长
-        :param: epoch 遍历次数
-        :return:包含参数[a,b,c,d,e,f]最优参数的矩阵
-        """
+    # def Template_opt(self, alpha, epoch, x1, x2, x3, x4):
+    #     """
+    #     description:
+    #     梯度下降主函数
+    #     :param: alpha 步长
+    #     :param: epoch 遍历次数
+    #     :return:包含参数[a,b,c,d,e,f]最优参数的矩阵
+    #     """
+    #
+    #     theta = 1000
+    #     Jacobian = self.jacobian_matrix(self.cost_function, x1, x2, x3, x4)
+    #     E_theta = []
+    #     for i in range(epoch):
+    #         self.Matrix_RT_Conversion(i)
+    #         loss = self.cost_function(x1, x2, x3, x4)  # 得到元组构成的loss
+    #
+    #         for j in range(len(loss)):
+    #             E_theta.append(loss[j])
+    #         E_theta = np.array(E_theta)
+    #         E_theta = E_theta.reshape(1, 12)
+    #         theta = theta - alpha * E_theta @ Jacobian
+    #
+    #     return theta
+    #
+    # def Template_total(self):
+    #     """
+    #     description:
+    #         计算并优化模板坐标系的总执行函数。
+    #     :param:
+    #     :return:
+    #     """
+    #     j = []
+    #     loss = []
+    #     for i in range(1, self.Fig_N):
+    #         self.Matrix_RT_Conversion(i)
+    #         loss.append(self.cost_function(self.Pt_0, self.Pt_1, self.Pt_2, self.Pt_3))
+    #     print(loss)
 
-        theta = 1000
-        Jacobian = self.jacobian_matrix(self.cost_function, x1, x2, x3, x4)
-        E_theta = []
-        for i in range(epoch):
-            self.Matrix_RT_Conversion(i)
-            loss = self.cost_function(x1, x2, x3, x4)  # 得到元组构成的loss
 
-            for j in range(len(loss)):
-                E_theta.append(loss[j])
-            E_theta = np.array(E_theta)
-            E_theta = E_theta.reshape(1, 12)
-            theta = theta - alpha * E_theta @ Jacobian
+"""
+使用SGD优化器，对参数进行优化：
+"""
 
-        return theta
 
-    def Template_total(self):
-        """
-        description:
-            计算并优化模板坐标系的总执行函数。
-        :param:
-        :return:
-        """
-        j = []
-        loss = []
-        for i in range(1, self.Fig_N):
-            self.Matrix_RT_Conversion(i)
-            loss.append(self.cost_function(self.Pt_0, self.Pt_1, self.Pt_2, self.Pt_3))
-        print(loss)
+def model(a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3, N):
+    """
+    对于估计值的建模
+    :param N:
+    :param a: 参数a
+    :param b:
+    :param c:
+    :param d:
+    :param e:
+    :param f:
+    :param alpha:
+    :param beta:
+    :param gamma:
+    :param T1:
+    :param T2:
+    :param T3:
+    :return:
+    """
+
+    E = torch.zeros(N * 12, 1)
+
+    for i in range(N):
+        E[i * 12] = T1[i]
+        E[i * 12 + 1] = T2[i]
+        E[i * 12 + 2] = T3[i]
+
+        E[i * 12 + 3] = T1[i] + a * math.cos(alpha[i]) * math.cos(beta[i])
+        E[i * 12 + 4] = T2[i] - a * (
+                math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(alpha[i]) * math.sin(beta[i]) * math.sin(
+            gamma[i]))
+        E[i * 12 + 5] = T3[i] + a * (
+                math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(gamma[i]) * math.sin(
+            beta[i]))
+
+        E[i * 12 + 6] = T1[i] + b * math.cos(alpha[i]) * math.cos(beta[i]) + c * math.cos(
+            beta[i]) * math.sin(alpha[i])
+        E[i * 12 + 7] = T2[i] - b * (
+                math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(beta[i]) * math.sin(beta[i]) * math.sin(
+            gamma[i])) + c * (math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(alpha[i]) * math.sin(
+            beta[i]) * math.sin(gamma[i]))
+        E[i * 12 + 8] = T3[i] + b * (
+                math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(gamma[i]) * math.sin(
+            beta[i])) - c * (math.cos(alpha[i]) * math.sin(gamma[i]) - math.cos(gamma[i]) * math.sin(
+            alpha[i]) * math.sin(beta[i]))
+
+        E[i * 12 + 9] = T1[i] - f * math.sin(beta[i]) + d * math.cos(alpha[i]) * math.cos(
+            beta[i]) + e * math.cos(beta[i]) * math.sin(alpha[i])
+        E[i * 12 + 10] = T2[i] - d * (
+                math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(alpha[i]) * math.sin(beta[i]) * math.sin(
+            gamma[i])) + e * (math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(alpha[i]) * math.sin(
+            beta[i]) * math.sin(gamma[i])) + f * math.cos(beta[i]) * math.sin(gamma[i])
+        E[i * 12 + 11] = T3[i] + d * (
+                math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(gamma[i]) * math.sin(
+            beta[i])) - e * (math.cos(alpha[i]) * math.sin(gamma[i]) - math.cos(gamma[i]) * math.sin(
+            alpha[i]) * math.sin(beta[i])) + f * math.cos(beta[i]) * math.cos(gamma[i])
+
+    # print(E)
+    return E
+
+
+def loss_fn(y_pred, y_test):
+    """
+    计算rmse
+
+    :param y_pred:预测值
+    :param y_test:实测值
+    :return:RMSE
+    """
+    MSE = torch.sum((y_test - y_pred) ** 2) / len(y_test)
+    RMSE = torch.sqrt(MSE)
+    return RMSE
+
+
+def RMSELoss(yhat, y):
+    """
+
+    :param yhat: 预测值
+    :param y: 真实值
+    :return:
+    """
+    return torch.sqrt(torch.mean((yhat - y) ** 2))
+
+
+def train_loop(n_epochs, optimizer, a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3, N, y_test):
+    """
+
+    :param n_epochs:
+    :param optimizer:
+    :param a:
+    :param b:
+    :param c:
+    :param d:
+    :param e:
+    :param f:
+    :param alpha:
+    :param beta:
+    :param gamma:
+    :param T1:
+    :param T2:
+    :param T3:
+    :param N:
+    :param y_test:
+    :return:
+    """
+    for epoch in range(n_epochs):
+        y_pred = model(a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3, N)
+        RMSE = RMSELoss(y_pred, y_test)
+
+        optimizer.zero_grad()
+
+        RMSE.backward()
+
+        # 参数的值会在调用step后更新
+        optimizer.step()
+
+        if epoch % 100 == 0:
+            print('Epoch %d ,RMSE %f' % (epoch, float(RMSE)))
+
+    return a, b, c, d, e, f
+
+
+if __name__ == '__main__':
+    # 获取当前脚本所在文件夹的路径
+    curpath = os.path.dirname(os.path.realpath(__file__))
+    # 获取yaml文件路经
+    # Yaml_name = input("please Fill in the name of the .yaml file (path): ")
+    yamlpath = os.path.join(curpath, "../YamlFiles/experience_data1.yaml")
+    # yamlpath = os.path.join(curpath, Yaml_name)
+    yaml_op1 = yaml_handle(yamlpath)
+    data = yaml_op1.get_yaml()
+    Data = yaml_op1.conver_yaml(data)
+
+    # N:数据维度
+    N = len(data)
+    # 将数据按（列）重新reshape,"f":按照列填入
+    Data = Data.reshape(Data.shape[0], 3, 4, order='F')
+    print(Data.shape)
+    # 创建实例对象
+    template_data = template(Data)
+    template_data.Template_PointReorder()
+    # 创建初始化模板
+    template_init = template_data.Template_initBuild(0)
+
+    """
+    梯度下降优化部分：
+    """
+    # 待优化参数提取
+    a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3, P_M = template_data.theta_Dataproc()
+    # 将待优化参数转换成张量，并允许计算梯度
+    a = torch.tensor(a, requires_grad=True)
+    b = torch.tensor(b, requires_grad=True)
+    c = torch.tensor(c, requires_grad=True)
+    d = torch.tensor(d, requires_grad=True)
+    e = torch.tensor(e, requires_grad=True)
+    f = torch.tensor(f, requires_grad=True)
+    alpha = torch.tensor(alpha, requires_grad=True)
+    beta = torch.tensor(beta, requires_grad=True)
+    gamma = torch.tensor(gamma, requires_grad=True)
+    T1 = torch.tensor(T1, requires_grad=True)
+    T2 = torch.tensor(T2, requires_grad=True)
+    T3 = torch.tensor(T3, requires_grad=True)
+    P_M = torch.tensor(P_M, requires_grad=True)
+    # 建立并初始化优化器,将动量设置为0就是简单的批处理梯度下降
+    # learning_rate = 1e-1
+    optimizer0 = optim.Adam([a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3], lr=1e-2)
+
+    # 迭代训练
+    a1, b1, c1, d1, e1, f1 = train_loop(n_epochs=3000, optimizer=optimizer0, a=a, b=b, c=c, d=d, e=e, f=f, alpha=alpha,
+                                        beta=beta, gamma=gamma, T1=T1, T2=T2, T3=T3, N=N, y_test=P_M)
+    print(a1, b1, c1, d1, e1, f1)
