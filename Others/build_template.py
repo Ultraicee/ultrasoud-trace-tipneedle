@@ -727,28 +727,29 @@ if __name__ == '__main__':
 
     """
     梯度下降优化部分：
+    优化器失败了，暂时做不出来 2023/5/4
     """
     # 待优化参数提取
     a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3, P_M = template_data.theta_Dataproc()
     # 将待优化参数转换成张量，并允许计算梯度
-    a = torch.tensor(a, requires_grad=True)
-    b = torch.tensor(b, requires_grad=True)
-    c = torch.tensor(c, requires_grad=True)
-    d = torch.tensor(d, requires_grad=True)
-    e = torch.tensor(e, requires_grad=True)
-    f = torch.tensor(f, requires_grad=True)
-    alpha = torch.tensor(alpha, requires_grad=True)
-    beta = torch.tensor(beta, requires_grad=True)
-    gamma = torch.tensor(gamma, requires_grad=True)
-    T1 = torch.tensor(T1, requires_grad=True)
-    T2 = torch.tensor(T2, requires_grad=True)
-    T3 = torch.tensor(T3, requires_grad=True)
-    P_M = torch.tensor(P_M, requires_grad=True)
-    # 建立并初始化优化器,将动量设置为0就是简单的批处理梯度下降
-    # learning_rate = 1e-1
-    optimizer0 = optim.Adam([a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3], lr=1e-2)
-
-    # 迭代训练
-    a1, b1, c1, d1, e1, f1 = train_loop(n_epochs=3000, optimizer=optimizer0, a=a, b=b, c=c, d=d, e=e, f=f, alpha=alpha,
-                                        beta=beta, gamma=gamma, T1=T1, T2=T2, T3=T3, N=N, y_test=P_M)
-    print(a1, b1, c1, d1, e1, f1)
+    # a = torch.tensor(a, requires_grad=True)
+    # b = torch.tensor(b, requires_grad=True)
+    # c = torch.tensor(c, requires_grad=True)
+    # d = torch.tensor(d, requires_grad=True)
+    # e = torch.tensor(e, requires_grad=True)
+    # f = torch.tensor(f, requires_grad=True)
+    # alpha = torch.tensor(alpha, requires_grad=True)
+    # beta = torch.tensor(beta, requires_grad=True)
+    # gamma = torch.tensor(gamma, requires_grad=True)
+    # T1 = torch.tensor(T1, requires_grad=True)
+    # T2 = torch.tensor(T2, requires_grad=True)
+    # T3 = torch.tensor(T3, requires_grad=True)
+    # P_M = torch.tensor(P_M, requires_grad=True)
+    # # 建立并初始化优化器,将动量设置为0就是简单的批处理梯度下降
+    # # learning_rate = 1e-1
+    # optimizer0 = optim.Adam([a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3], lr=1e-2)
+    #
+    # # 迭代训练
+    # a1, b1, c1, d1, e1, f1 = train_loop(n_epochs=3000, optimizer=optimizer0, a=a, b=b, c=c, d=d, e=e, f=f, alpha=alpha,
+    #                                     beta=beta, gamma=gamma, T1=T1, T2=T2, T3=T3, N=N, y_test=P_M)
+    # print(a1, b1, c1, d1, e1, f1)
