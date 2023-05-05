@@ -417,9 +417,16 @@ class template:
         p2 = torch.tensor(p2)
         p3 = torch.tensor(p3)
 
-        E = torch.zeros(N * 12, 1)
-
+        # E = torch.zeros(N * 12, 1)
+        E = np.zeros((N * 12, 1))  # 预测值向量
+        J = np.zeros((N * 12, 6 + 6 * N))  # 预测值向量的雅可比矩阵，rows:12N,cols:6+6N(6为模板矩阵6个参数，6N为N组3个欧拉角和3个平移向量组合起来）
+        """
+         由于通过预测值向量求取的雅可比矩阵是个很大的稀疏矩阵，只需要索引出非零值即可。
+        """
         for i in range(N):
+            """
+            构建损失函数
+            """
             E[i * 12] = T1[i] - p0[i * 3]
             E[i * 12 + 1] = T2[i] - p0[i * 3 + 1]
             E[i * 12 + 2] = T3[i] - p0[i * 3 + 2]
@@ -454,10 +461,126 @@ class template:
                 beta[i])) - e * (math.cos(alpha[i]) * math.sin(gamma[i]) - math.cos(gamma[i]) * math.sin(
                 alpha[i]) * math.sin(beta[i])) + f * math.cos(beta[i]) * math.cos(gamma[i])
 
-        print(E)
-        return E
+            """ 
+            构建损失函数的雅可比矩阵
+            rows->3:8   cols->0:2
+            """
+            J[12 * i + 3, 0] = math.cos(alpha[i]) * math.cos(beta[i])
+            J[12 * i + 4, 0] = math.cos(alpha[i]) * math.cos(beta[i]) * math.sin(gamma[i]) - math.cos(
+                gamma[i]) * math.sin(alpha[i])
+            J[12 * i + 5, 0] = math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(
+                gamma[i]) * math.sin(beta[i])
+            J[12 * i + 6, 1] = math.cos(alpha[i]) * math.cos(beta[i])
+            J[12 * i + 6, 2] = math.cos(beta[i]) * math.sin(alpha[i])
+            J[12 * i + 7, 1] = math.cos(alpha[i]) * math.sin(beta[i]) * math.sin(gamma[i]) - math.cos(
+                gamma[i]) * math.sin(alpha[i])
+            J[12 * i + 7, 2] = math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(alpha[i]) * math.sin(
+                beta[i]) * math.sin(gamma[i])
 
-    # return self.R @ x1 + self.t, self.R @ x2 + self.t, self.R @ x3 + self.t, self.R @ x4 + self.t
+            J[12 * i + 8, 1] = math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(
+                gamma[i]) * math.sin(beta[i])
+            J[12 * i + 8, 2] = math.cos(gamma[i]) * math.sin(alpha) * math.sin(beta[i]) - math.cos(alpha[i]) * math.sin(
+                gamma[i])
+
+            """
+            rows->0:8 cols->6:6+5
+            """
+
+            J[12 * i, 6 + 6 * i + 3] = 1
+            J[12 * i + 1, 6 + 6 * i + 4] = 1
+            J[12 * i + 2, 6 + 6 * i + 5] = 1
+            J[12 * i + 3, 6 + 6 * i] = -math.cos(beta[i]) * math.sin(alpha[i]) * a
+            J[12 * i + 3, 6 + 6 * i + 1] = -math.cos(alpha[i]) * math.sin(beta[i]) * a
+            J[12 * i + 3, 6 + 6 * i + 3] = 1
+            J[12 * i + 4, 6 + 6 * i] = -a * (math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(alpha[i]) * math.sin(
+                beta[i]) * math.sin(gamma[i]))
+            J[12 * i + 4, 6 + 6 * i + 1] = math.cos(alpha[i]) * math.cos(beta[i]) * math.sin(gamma[i]) * a
+            J[12 * i + 4, 6 + 6 * i + 2] = a * (math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(
+                gamma[i]) * math.sin(beta[i]))
+            J[12 * i + 4, 6 + 6 * i + 4] = 1
+            J[12 * i + 5, 6 + 6 * i] = a * (math.cos(alpha[i]) * math.sin(gamma[i]) - math.sin(alpha[i]) * math.sin(
+                beta[i]) * math.cos(gamma[i]))
+            J[12 * i + 5, 6 + 6 * i + 1] = math.cos(alpha[i]) * math.cos(beta[i]) * math.cos(gamma[i]) * a
+            J[12 * i + 5, 6 + 6 * i + 2] = a * (math.sin(alpha[i]) * math.cos(gamma[i]) - math.cos(alpha[i]) * math.sin(
+                gamma[i]) * math.sin(beta[i]))
+            J[12 * i + 5, 6 + 6 * i + 5] = 1
+            J[12 * i + 6, 6 + 6 * i] = math.cos(alpha[i]) * math.cos(beta[i]) * c - math.cos(beta[i]) * math.sin(
+                alpha[i]) * b
+            J[12 * i + 6, 6 + 6 * i + 1] = -math.cos(alpha[i]) * math.sin(beta[i]) * b - math.sin(alpha[i]) * math.sin(
+                beta[i]) * c
+            J[12 * i + 6, 6 + 6 * i + 3] = 1
+            J[12 * i + 7, 6 + 6 * i] = -b * (
+                    math.cos(alpha[i]) * math.cos(gamma[i]) * math.sin(alpha[i]) * math.sin(beta[i]) * math.sin(
+                gamma[i])) - c * ((math.cos(gamma[i]) * math.sin(alpha[i])) - math.cos(alpha[i]) * math.sin(
+                beta[i]) * math.sin(gamma[i]))
+            J[12 * i + 7, 6 + 6 * i + 1] = math.cos(alpha[i]) * math.cos(beta[i]) * math.sin(gamma[i]) * b + math.cos(
+                beta[i]) * math.sin(alpha[i]) * math.sin(gamma[i]) * c
+            J[12 * i + 7, 6 + 6 * i + 2] = b * (math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(
+                gamma[i]) * math.sin(beta[i])) - c * (math.cos(alpha[i]) * math.sin(gamma[i]) - math.cos(
+                gamma[i]) * math.sin(alpha[i]) * math.sin(beta[i]))
+            J[12 * i + 7, 6 + 6 * i + 4] = 1
+            J[12 * i + 8, 6 + 6 * i] = b * (math.cos(alpha[i]) * math.sin(gamma[i]) - math.sin(alpha[i]) * math.sin(
+                beta[i]) * math.cos(gamma[i])) + c * (math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(
+                alpha[i]) * math.cos(gamma[i]) * math.sin(beta[i]))
+            J[12 * i + 8, 6 + 6 * i + 1] = b * math.cos(alpha[i]) * math.cos(beta[i]) * math.cos(gamma[i]) + math.cos(
+                beta[i]) * math.cos(gamma[i]) * math.sin(alpha[i]) * c
+            J[12 * i + 8, 6 + 6 * i + 2] = b * (math.sin(alpha[i]) * math.cos(gamma[i]) - math.cos(alpha[i]) * math.sin(
+                gamma[i]) * math.sin(beta[i])) - c * (math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(
+                alpha[i]) * math.sin(beta[i]) * math.sin(gamma[i]))
+            J[12 * i + 8, 6 + 6 * i + 5] = 1
+
+            """
+            rows->9:11 cols->3:5
+            """
+            J[12 * i + 3 * 4 - 3, 3 * 4 - 9] = math.cos(alpha[i]) * math.cos(beta[i])
+            J[12 * i + 3 * 4 - 3, 3 * 4 - 8] = math.cos(beta[i]) * math.sin(alpha[i])
+            J[12 * i + 3 * 4 - 3, 3 * 4 - 7] = -math.sin(beta[i])
+            J[12 * i + 3 * 4 - 3, 6 + 6 * i] = math.cos(alpha[i]) * math.cos(beta[i]) * e - math.cos(
+                beta[i]) * math.sin(alpha[i]) * d
+            J[12 * i + 3 * 4 - 3, 6 + 6 * i + 1] = -math.cos(beta[i]) * f - math.cos(alpha[i]) * math.sin(
+                beta[i]) * d - math.sin(alpha[i]) * math.sin(beta[i]) * e
+            J[12 * i + 3 * 4 - 3, 6 + 6 * i + 3] = 1
+            J[12 * i + 3 * 4 - 2, 3 * 4 - 9] = math.cos(alpha[i]) * math.sin(beta[i]) * math.sin(gamma[i]) - math.cos(
+                gamma[i]) * math.sin(alpha[i])
+            J[12 * i + 3 * 4 - 2, 3 * 4 - 8] = math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(alpha[i]) * math.sin(
+                beta[i]) * math.sin(gamma[i])
+            J[12 * i + 3 * 4 - 2, 3 * 4 - 7] = math.cos(beta[i]) * math.sin(gamma[i])
+            J[12 * i + 3 * 4 - 2, 6 + 6 * i] = -d * (math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(
+                alpha[i]) * math.sin(beta[i]) * math.sin(gamma[i])) - e * (
+                                                       math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(
+                                                   alpha[i]) * math.sin(beta[i]) * math.sin(gamma[i]))
+            J[12 * i + 3 * 4 - 2, 6 * 6 * i + 1] = math.cos(alpha[i]) * math.cos(beta[i]) * math.sin(
+                gamma[i]) * d - math.sin(beta[i]) * math.sin(gamma[i]) * f + math.cos(beta[i]) * math.sin(
+                alpha[i]) * math.sin(gamma[i]) * e
+            J[12 * i + 3 * 4 - 2, 6 + 6 * i + 2] = d * (
+                    math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(gamma[i]) * math.sin(
+                beta[i])) - e * (math.cos(alpha[i]) * math.sin(gamma[i]) - math.cos(gamma[i]) * math.sin(
+                alpha[i]) * math.sin(beta[i])) + f * math.cos(beta[i]) * math.cos(gamma[i])
+            J[12 * i + 3 * 4 - 2, 6 + 6 * i + 4] = 1
+            J[12 * i + 3 * 4 - 1, 3 * 4 - 9] = math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(
+                gamma[i]) * math.sin(beta[i])
+            J[12 * i + 3 * 4 - 1, 3 * 4 - 8] = math.cos(gamma[i]) * math.sin(alpha[i]) * math.sin(beta[i]) - math.cos(
+                alpha[i]) * math.sin(gamma[i])
+            J[12 * i + 3 * 4 - 1, 3 * 4 - 7] = math.cos(beta[i]) * math.cos(gamma[i])
+            J[12 * i + 3 * 4 - 1, 6 + 6 * i] = d * (
+                    math.cos(alpha[i]) * math.sin(gamma[i]) - math.sin(alpha[i]) * math.sin(beta[i]) * math.cos(
+                gamma[i])) + e * (math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(
+                gamma[i]) * math.sin(beta[i]))
+            J[12 * i + 3 * 4 - 1, 6 + 6 * i + 1] = math.cos(alpha[i]) * math.cos(beta[i]) * math.cos(
+                gamma[i]) * d - math.cos(gamma[i]) * math.sin(beta[i]) * f + math.cos(beta[i]) * math.cos(
+                gamma[i]) * math.sin(alpha[i]) * e
+            J[12 * i + 3 * 4 - 1, 6 + 6 * i + 2] = d * (
+                    math.sin(alpha[i]) * math.cos(gamma[i]) - math.cos(alpha[i]) * math.sin(gamma[i]) * math.sin(
+                beta[i])) - e * (math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(alpha[i]) * math.sin(
+                beta[i]) * math.sin(gamma[i])) - f * math.cos(beta[i]) * math.sin(gamma[i])
+            J[12 * i + 3 * 4 - 1, 6 + 6 * i + 5] = 1
+
+        # 计算梯度：
+        grad = -E.T @ J
+        return grad
+
+    def Template_OPT(self):
+        pass
 
     def jacobian_matrix(self):
         """
@@ -578,7 +701,7 @@ class template:
 
 
 """
-使用SGD优化器，对参数进行优化：
+尝试使用SGD优化器，对参数进行优化：
 """
 
 
