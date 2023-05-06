@@ -595,12 +595,12 @@ class template:
         """
         N = self.Fig_N
         # 将模板坐标系的初值提取出来，并给参数添加一点偏置。
-        a = (self.Pt_1[0].copy() + 1)
-        b = (self.Pt_2[0].copy() + 1)
-        c = (self.Pt_2[1].copy() - 1)
-        d = (self.Pt_3[0].copy() - 1)
-        e = (self.Pt_3[1].copy() - 1)
-        f = (self.Pt_3[2].copy() - 1)
+        a = self.Pt_1[0].copy() + 1
+        b = self.Pt_2[0].copy() + 1
+        c = self.Pt_2[1].copy() - 1
+        d = self.Pt_3[0].copy() - 1
+        e = self.Pt_3[1].copy() - 1
+        f = self.Pt_3[2].copy() - 1
 
         # 构建测量值矩阵
         P_test = []
@@ -636,14 +636,15 @@ class template:
                 self.beta[i] += 0.000001 * delta_p[0, 6 + 6 * i + 1]
                 self.gamma[i] += 0.000001 * delta_p[0, 6 + 6 * i + 2]
                 # 平移向量
-                self.T1[i] += 0.0001 * delta_p[0, 6 + 6 * i + 3]
-                self.T2[i] += 0.0001 * delta_p[0, 6 + 6 * i + 4]
-                self.T3[i] += 0.0001 * delta_p[0, 6 + 6 * i + 5]
+                self.T1[i] += 0.00001 * delta_p[0, 6 + 6 * i + 3]
+                self.T2[i] += 0.00001 * delta_p[0, 6 + 6 * i + 4]
+                self.T3[i] += 0.00001 * delta_p[0, 6 + 6 * i + 5]
 
             # 计算RMSE指标数值，判断是否需要下轮更新。
             self.R = []
             self.t = []
             for i in range(N):
+                # 用优化后的欧拉角转换成旋转矩阵
                 R = eulerAnglesToRotationMatrix(self.alpha[i], self.beta[i], self.gamma[i])
                 self.R.append(R)
                 self.t.append(self.T1[i])
