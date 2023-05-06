@@ -108,14 +108,18 @@ if __name__ == '__main__':
     # 获取当前脚本所在文件夹的路经
     curpath = os.path.dirname(os.path.realpath(__file__))
     # 获取yaml文件路经
+    """
+    推荐yaml保存位置：../YamlFiles/xxxxx.yaml
+    """
     Yaml_name = input("please Fill in the save name of the .yaml file (path): ")
-    # yamlpath = os.path.join(curpath, "YamlFiles/experience_data1.yaml")
+    # yamlpath = os.path.join(curpath, "../YamlFiles/experience_data1.yaml")
     yamlpath = os.path.join(curpath, Yaml_name)
     yaml_op1 = yaml_handle(yamlpath)
     yaml_op1.init_yaml()
 
     """
     # 读取.mat 文件操作，并转换成.yaml文件
+    mat文件存放位置：../matFiles/xxxx/xxxxx.mat
     """
     Mat_name = input("please Fill in the path and name of .mat file: ")
     data = io.loadmat(Mat_name)
@@ -129,7 +133,7 @@ if __name__ == '__main__':
     for i in range(int(rows / 4)):
         dic[f"frame_{i}"] = Data[i].tolist()
         yaml_op1.add_yaml(f"frame_{i}", i, 3, 4, dic[f"frame_{i}"])
-
+    print("FINISHED")
     """
     # 读取.yaml文件，将里面的data数据转换成能使用的格式
     """

@@ -119,6 +119,7 @@ class template:
         # RT旋转平移矩阵temp
         self.R = []
         self.t = []
+
         # 欧拉角(由旋转矩阵转换而来)
         self.alpha = None
         self.beta = None
@@ -356,6 +357,13 @@ class template:
         for i in range(N):
             alpha[i], beta[i], gamma[i], T1[i], T2[i], T3[i] = self.Matrix_RT_Conversion(i)
 
+        self.alpha = alpha
+        self.beta = beta
+        self.gamma = gamma
+        self.T1 = T1
+        self.T2 = T2
+        self.T3 = T3
+
         a = self.Pt_1[0].copy()
         b = self.Pt_2[0].copy()
         c = self.Pt_2[1].copy()
@@ -412,10 +420,10 @@ class template:
         p2 = self.reorder_P2.copy().reshape(3 * N, 1)
         p3 = self.reorder_P3.copy().reshape(3 * N, 1)
 
-        p0 = torch.tensor(p0)
-        p1 = torch.tensor(p1)
-        p2 = torch.tensor(p2)
-        p3 = torch.tensor(p3)
+        # p0 = torch.tensor(p0)
+        # p1 = torch.tensor(p1)
+        # p2 = torch.tensor(p2)
+        # p3 = torch.tensor(p3)
 
         # E = torch.zeros(N * 12, 1)
         E = np.zeros((N * 12, 1))  # 预测值向量
@@ -442,7 +450,7 @@ class template:
             E[i * 12 + 6] = T1[i] - p2[i * 3] + b * math.cos(alpha[i]) * math.cos(beta[i]) + c * math.cos(
                 beta[i]) * math.sin(alpha[i])
             E[i * 12 + 7] = T2[i] - p2[i * 3 + 1] - b * (
-                    math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(beta[i]) * math.sin(beta[i]) * math.sin(
+                    math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(alpha[i]) * math.sin(beta[i]) * math.sin(
                 gamma[i])) + c * (math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(alpha[i]) * math.sin(
                 beta[i]) * math.sin(gamma[i]))
             E[i * 12 + 8] = T3[i] - p2[i * 3 + 2] + b * (
@@ -479,7 +487,8 @@ class template:
 
             J[12 * i + 8, 1] = math.sin(alpha[i]) * math.sin(gamma[i]) + math.cos(alpha[i]) * math.cos(
                 gamma[i]) * math.sin(beta[i])
-            J[12 * i + 8, 2] = math.cos(gamma[i]) * math.sin(alpha) * math.sin(beta[i]) - math.cos(alpha[i]) * math.sin(
+            J[12 * i + 8, 2] = math.cos(gamma[i]) * math.sin(alpha[i]) * math.sin(beta[i]) - math.cos(
+                alpha[i]) * math.sin(
                 gamma[i])
 
             """
@@ -549,7 +558,7 @@ class template:
                 alpha[i]) * math.sin(beta[i]) * math.sin(gamma[i])) - e * (
                                                        math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(
                                                    alpha[i]) * math.sin(beta[i]) * math.sin(gamma[i]))
-            J[12 * i + 3 * 4 - 2, 6 * 6 * i + 1] = math.cos(alpha[i]) * math.cos(beta[i]) * math.sin(
+            J[12 * i + 3 * 4 - 2, 6 + 6 * i + 1] = math.cos(alpha[i]) * math.cos(beta[i]) * math.sin(
                 gamma[i]) * d - math.sin(beta[i]) * math.sin(gamma[i]) * f + math.cos(beta[i]) * math.sin(
                 alpha[i]) * math.sin(gamma[i]) * e
             J[12 * i + 3 * 4 - 2, 6 + 6 * i + 2] = d * (
@@ -580,7 +589,74 @@ class template:
         return grad
 
     def Template_OPT(self):
-        pass
+        """
+        梯度下降算法主要函数
+        :return:
+        """
+        N = self.Fig_N
+        # 将模板坐标系的初值提取出来，并给参数添加一点偏置。
+        a = (self.Pt_1[0].copy() + 1)
+        b = (self.Pt_2[0].copy() + 1)
+        c = (self.Pt_2[1].copy() - 1)
+        d = (self.Pt_3[0].copy() - 1)
+        e = (self.Pt_3[1].copy() - 1)
+        f = (self.Pt_3[2].copy() - 1)
+
+        # 构建测量值矩阵
+        P_test = []
+        for i in range(N):
+            temp = np.array([self.reorder_P0[i], self.reorder_P1[i], self.reorder_P2[i], self.reorder_P3[i]])
+            P_test.append(temp.T)
+        P_test = np.array(P_test).reshape(N * 3, 4)
+        # 给欧拉角和平移向量添加一点偏置
+        for i in range(N):
+            self.alpha[i] += 0.1
+            self.beta[i] -= 0.1
+            self.gamma[i] += 0.1
+            self.T1[i] += 1
+            self.T2[i] -= 1
+            self.T3[i] += 1
+
+        epoch = 0
+        delta_p = np.zeros((1, 6 + 6 * N))  # 梯度值初始化
+        while epoch < 5000:
+            delta_p = self.cost_function(a, b, c, d, e, f, self.alpha, self.beta, self.gamma, self.T1, self.T2, self.T3)
+            # 更新模板6个参数的值，学习率为0.01
+
+            a += 0.00001 * delta_p[0, 0]
+            b += 0.00001 * delta_p[0, 1]
+            c += 0.00001 * delta_p[0, 2]
+            d += 0.00001 * delta_p[0, 3]
+            e += 0.00001 * delta_p[0, 4]
+            f += 0.00001 * delta_p[0, 5]
+            # 更新欧拉角和平移向量的值，学习率分别为0.00005,0.01
+            for i in range(N):
+                # 欧拉角
+                self.alpha[i] += 0.000001 * delta_p[0, 6 + 6 * i]
+                self.beta[i] += 0.000001 * delta_p[0, 6 + 6 * i + 1]
+                self.gamma[i] += 0.000001 * delta_p[0, 6 + 6 * i + 2]
+                # 平移向量
+                self.T1[i] += 0.0001 * delta_p[0, 6 + 6 * i + 3]
+                self.T2[i] += 0.0001 * delta_p[0, 6 + 6 * i + 4]
+                self.T3[i] += 0.0001 * delta_p[0, 6 + 6 * i + 5]
+
+            # 计算RMSE指标数值，判断是否需要下轮更新。
+            self.R = []
+            self.t = []
+            for i in range(N):
+                R = eulerAnglesToRotationMatrix(self.alpha[i], self.beta[i], self.gamma[i])
+                self.R.append(R)
+                self.t.append(self.T1[i])
+                self.t.append(self.T2[i])
+                self.t.append(self.T3[i])
+
+            self.R = np.array(self.R).reshape(N * 3, 3)
+            self.t = np.array(self.t)
+            temp_m = np.array([0, a, b, d, 0, 0, c, e, 0, 0, 0, f]).reshape(3, 4)
+            delta_M = self.R @ temp_m + self.t
+            RMSE = RMSELoss(delta_M, P_test)  # 参数1预测值，参数2真实值
+            epoch = epoch + 1
+            print('RMSE:%f' % RMSE)
 
     def jacobian_matrix(self):
         """
@@ -660,44 +736,6 @@ class template:
         # self.t = self.t.numpy()
 
         return J_torch
-
-    # def Template_opt(self, alpha, epoch, x1, x2, x3, x4):
-    #     """
-    #     description:
-    #     梯度下降主函数
-    #     :param: alpha 步长
-    #     :param: epoch 遍历次数
-    #     :return:包含参数[a,b,c,d,e,f]最优参数的矩阵
-    #     """
-    #
-    #     theta = 1000
-    #     Jacobian = self.jacobian_matrix(self.cost_function, x1, x2, x3, x4)
-    #     E_theta = []
-    #     for i in range(epoch):
-    #         self.Matrix_RT_Conversion(i)
-    #         loss = self.cost_function(x1, x2, x3, x4)  # 得到元组构成的loss
-    #
-    #         for j in range(len(loss)):
-    #             E_theta.append(loss[j])
-    #         E_theta = np.array(E_theta)
-    #         E_theta = E_theta.reshape(1, 12)
-    #         theta = theta - alpha * E_theta @ Jacobian
-    #
-    #     return theta
-    #
-    # def Template_total(self):
-    #     """
-    #     description:
-    #         计算并优化模板坐标系的总执行函数。
-    #     :param:
-    #     :return:
-    #     """
-    #     j = []
-    #     loss = []
-    #     for i in range(1, self.Fig_N):
-    #         self.Matrix_RT_Conversion(i)
-    #         loss.append(self.cost_function(self.Pt_0, self.Pt_1, self.Pt_2, self.Pt_3))
-    #     print(loss)
 
 
 """
@@ -785,10 +823,10 @@ def RMSELoss(yhat, y):
     :param y: 真实值
     :return:
     """
-    return torch.sqrt(torch.mean((yhat - y) ** 2))
+    return np.sqrt(np.mean((yhat - y) ** 2))
 
 
-def train_loop(n_epochs, optimizer, a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3, N, y_test):
+def train_loop(n_epochs, optimizer0, optimizer1, a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3, N, y_test):
     """
 
     :param n_epochs:
@@ -811,14 +849,15 @@ def train_loop(n_epochs, optimizer, a, b, c, d, e, f, alpha, beta, gamma, T1, T2
     """
     for epoch in range(n_epochs):
         y_pred = model(a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3, N)
-        RMSE = RMSELoss(y_pred, y_test)
+        RMSE = loss_fn(y_pred, y_test)
 
-        optimizer.zero_grad()
-
+        optimizer0.zero_grad()
+        optimizer1.zero_grad()
         RMSE.backward()
 
         # 参数的值会在调用step后更新
-        optimizer.step()
+        optimizer0.step()
+        optimizer1.step()
 
         if epoch % 100 == 0:
             print('Epoch %d ,RMSE %f' % (epoch, float(RMSE)))
@@ -831,7 +870,7 @@ if __name__ == '__main__':
     curpath = os.path.dirname(os.path.realpath(__file__))
     # 获取yaml文件路经
     # Yaml_name = input("please Fill in the name of the .yaml file (path): ")
-    yamlpath = os.path.join(curpath, "../YamlFiles/experience_data1.yaml")
+    yamlpath = os.path.join(curpath, "../YamlFiles/experience_data2.yaml")
     # yamlpath = os.path.join(curpath, Yaml_name)
     yaml_op1 = yaml_handle(yamlpath)
     data = yaml_op1.get_yaml()
@@ -847,14 +886,16 @@ if __name__ == '__main__':
     template_data.Template_PointReorder()
     # 创建初始化模板
     template_init = template_data.Template_initBuild(0)
-
+    # 梯度下降优化模板
+    template_data.theta_Dataproc()
+    template_data.Template_OPT()
     """
     梯度下降优化部分：
     优化器失败了，暂时做不出来 2023/5/4
     """
-    # 待优化参数提取
-    a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3, P_M = template_data.theta_Dataproc()
-    # 将待优化参数转换成张量，并允许计算梯度
+    # # 待优化参数提取
+    # a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3, P_M = template_data.theta_Dataproc()
+    # # 将待优化参数转换成张量，并允许计算梯度
     # a = torch.tensor(a, requires_grad=True)
     # b = torch.tensor(b, requires_grad=True)
     # c = torch.tensor(c, requires_grad=True)
@@ -870,9 +911,10 @@ if __name__ == '__main__':
     # P_M = torch.tensor(P_M, requires_grad=True)
     # # 建立并初始化优化器,将动量设置为0就是简单的批处理梯度下降
     # # learning_rate = 1e-1
-    # optimizer0 = optim.Adam([a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3], lr=1e-2)
-    #
+    # optimizer0 = optim.Adam([a, b, c, d, e, f, T1, T2, T3], lr=1e-1)
+    # optimizer1 = optim.Adam([alpha, beta, gamma], lr=1e-5)
     # # 迭代训练
-    # a1, b1, c1, d1, e1, f1 = train_loop(n_epochs=3000, optimizer=optimizer0, a=a, b=b, c=c, d=d, e=e, f=f, alpha=alpha,
+    # a1, b1, c1, d1, e1, f1 = train_loop(n_epochs=3000, optimizer0=optimizer0, optimizer1=optimizer1, a=a, b=b, c=c, d=d,
+    #                                     e=e, f=f, alpha=alpha,
     #                                     beta=beta, gamma=gamma, T1=T1, T2=T2, T3=T3, N=N, y_test=P_M)
     # print(a1, b1, c1, d1, e1, f1)
