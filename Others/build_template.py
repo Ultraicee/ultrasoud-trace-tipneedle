@@ -600,7 +600,7 @@ class template:
         c = self.Pt_2[1].copy() - 1
         d = self.Pt_3[0].copy() - 1
         e = self.Pt_3[1].copy() - 1
-        f = self.Pt_3[2].copy() - 1
+        f = self.Pt_3[2].copy() + 2
 
         # 构建测量值矩阵
         P_test = []
@@ -621,24 +621,24 @@ class template:
         delta_p = np.zeros((1, 6 + 6 * N))  # 梯度值初始化
         while epoch < 5000:
             delta_p = self.cost_function(a, b, c, d, e, f, self.alpha, self.beta, self.gamma, self.T1, self.T2, self.T3)
-            # 更新模板6个参数的值，学习率为0.01
+            # 更新模板6个参数的值
 
-            a += 0.00001 * delta_p[0, 0]
-            b += 0.00001 * delta_p[0, 1]
-            c += 0.00001 * delta_p[0, 2]
-            d += 0.00001 * delta_p[0, 3]
-            e += 0.00001 * delta_p[0, 4]
-            f += 0.00001 * delta_p[0, 5]
-            # 更新欧拉角和平移向量的值，学习率分别为0.00005,0.01
+            a += 0.00005 * delta_p[0, 0]
+            b += 0.00005 * delta_p[0, 1]
+            c += 0.00005 * delta_p[0, 2]
+            d += 0.00005 * delta_p[0, 3]
+            e += 0.00005 * delta_p[0, 4]
+            f += 0.00005 * delta_p[0, 5]
+            # 更新欧拉角和平移向量的值，学习率分别为
             for i in range(N):
                 # 欧拉角
                 self.alpha[i] += 0.000001 * delta_p[0, 6 + 6 * i]
                 self.beta[i] += 0.000001 * delta_p[0, 6 + 6 * i + 1]
                 self.gamma[i] += 0.000001 * delta_p[0, 6 + 6 * i + 2]
                 # 平移向量
-                self.T1[i] += 0.00001 * delta_p[0, 6 + 6 * i + 3]
-                self.T2[i] += 0.00001 * delta_p[0, 6 + 6 * i + 4]
-                self.T3[i] += 0.00001 * delta_p[0, 6 + 6 * i + 5]
+                self.T1[i] += 0.00005 * delta_p[0, 6 + 6 * i + 3]
+                self.T2[i] += 0.00005 * delta_p[0, 6 + 6 * i + 4]
+                self.T3[i] += 0.00005 * delta_p[0, 6 + 6 * i + 5]
 
             # 计算RMSE指标数值，判断是否需要下轮更新。
             self.R = []
@@ -702,7 +702,7 @@ def model(a, b, c, d, e, f, alpha, beta, gamma, T1, T2, T3, N):
         E[i * 12 + 6] = T1[i] + b * math.cos(alpha[i]) * math.cos(beta[i]) + c * math.cos(
             beta[i]) * math.sin(alpha[i])
         E[i * 12 + 7] = T2[i] - b * (
-                math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(beta[i]) * math.sin(beta[i]) * math.sin(
+                math.cos(gamma[i]) * math.sin(alpha[i]) - math.cos(alpha[i]) * math.sin(beta[i]) * math.sin(
             gamma[i])) + c * (math.cos(alpha[i]) * math.cos(gamma[i]) + math.sin(alpha[i]) * math.sin(
             beta[i]) * math.sin(gamma[i]))
         E[i * 12 + 8] = T3[i] + b * (
