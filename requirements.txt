@@ -1,4 +1,4 @@
-python >= 3.6
+
 cycler == 0.11.0
 dataclasses == 0.8
 kiwisolver==1.3.1
