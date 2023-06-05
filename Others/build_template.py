@@ -801,7 +801,7 @@ if __name__ == '__main__':
     # N:数据维度
     N = len(data)
     # 将数据按（列）重新reshape,"f":按照列填入
-    Data = Data.reshape(Data.shape[0], 3, 4, order='F')
+    Data = Data.reshape(Data.shape[0], 3, 4)
     print(Data.shape)
     # 创建实例对象
     template_data = template(Data)
