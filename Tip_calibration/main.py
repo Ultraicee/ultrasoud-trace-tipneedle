@@ -10,11 +10,11 @@ if __name__ == '__main__':
     curpath = os.path.dirname(os.path.realpath(__file__))
     # 获取yaml文件路经
     Yaml_name = input("please Fill in the name of the .yaml file (path): ")
-    # yamlpath = os.path.join(curpath, "../YamlFiles/experience_data1.yaml")
+    # yamlpath = os.path.join(curpath, "../YamlFiles/Template_data1.yaml")
     yamlpath = os.path.join(curpath, Yaml_name)
     yaml_op1 = yaml_create.yaml_handle(yamlpath)
     data = yaml_op1.get_yaml()
-    Data = yaml_op1.conver_yaml(data)
+    Data = yaml_op1.conver_yaml(data, 'needletip')
 
     # N:数据的大小
     N = len(data)
