@@ -8,7 +8,7 @@
 
 > 预计效果：模板坐标求取之后，转换成yaml文件存储起来，符合4小球的模板都能直接只用此坐标轴。
 
-使用数据：``YamlFiles/experience_data2.yaml``
+使用数据：``YamlFiles/Template_data2.yaml``
 ## 标定超声波
 
-pass
+运行``UltraSound_Prove_calibration/US_calibra.py``文件，使用数据为``YamlFiles/ultrasound_pixel_data.yaml``和``YamlFiles/ultrasound_probe_data.yaml``
