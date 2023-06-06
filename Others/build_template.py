@@ -55,27 +55,42 @@ def rotationMatrixToEulerAngles(R):
 def eulerAnglesToRotationMatrix(alpha, beta, gamma):
     """
     description:
-        将欧拉角转换成旋转矩阵
+        将欧拉角转换成旋转矩阵,顺序为zyx
     :param: theta: [x,y,z]
     :return: R: shape(3,3) 旋转矩阵 type:numpy.ndarray
     """
-    R_x = np.array([[1, 0, 0],
-                    [0, math.cos(alpha), -math.sin(alpha)],
-                    [0, math.sin(alpha), math.cos(alpha)]
-                    ])
-
-    R_y = np.array([[math.cos(beta), 0, math.sin(beta)],
-                    [0, 1, 0],
-                    [-math.sin(beta), 0, math.cos(beta)]
-                    ])
-
-    R_z = np.array([[math.cos(gamma), -math.sin(gamma), 0],
-                    [math.sin(gamma), math.cos(gamma), 0],
+    # R_x = np.array([[1, 0, 0],
+    #                 [0, math.cos(alpha), -math.sin(alpha)],
+    #                 [0, math.sin(alpha), math.cos(alpha)]
+    #                 ])
+    #
+    # R_y = np.array([[math.cos(beta), 0, math.sin(beta)],
+    #                 [0, 1, 0],
+    #                 [-math.sin(beta), 0, math.cos(beta)]
+    #                 ])
+    #
+    # R_z = np.array([[math.cos(gamma), -math.sin(gamma), 0],
+    #                 [math.sin(gamma), math.cos(gamma), 0],
+    #                 [0, 0, 1]
+    #                 ])
+    #
+    # R = np.dot(R_z, np.dot(R_y, R_x))
+    R_z = np.array([[math.cos(alpha), math.sin(alpha), 0],
+                    [-math.sin(alpha), math.cos(alpha), 0],
                     [0, 0, 1]
                     ])
 
-    R = np.dot(R_z, np.dot(R_y, R_x))
+    R_y = np.array([[math.cos(beta), 0, -math.sin(beta)],
+                    [0, 1, 0],
+                    [math.sin(beta), 0, math.cos(beta)]
+                    ])
 
+    R_x = np.array([[1, 0, 0],
+                    [0, math.cos(gamma), math.sin(gamma)],
+                    [0, -math.sin(gamma), math.cos(gamma)]
+                    ])
+
+    R = np.dot(R_x, np.dot(R_y, R_z))
     return R
 
 

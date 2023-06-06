@@ -47,9 +47,9 @@ class yaml_handle:
             name: N Frames,id:id,rows:Matrix's rows,lines:Matrix's lines,M_data:N frames's Matrix.
         :return:
         """
-        if Types == ('needletip' or 'probecam'):
+        if Types == 'needletip':
             """
-            适用于针尖、超声波模版坐标系数据
+            适用于针尖模板坐标系数据
             """
             data = {
                 name: {
@@ -102,6 +102,33 @@ class yaml_handle:
             }
             with open(self.file, 'a', encoding='utf-8') as f:
                 yaml.dump(data, f, allow_unicode=True)
+        elif Types == 'probecam':
+            """
+            适用于超声波模版坐标系数据
+            """
+            data = {
+                name: {
+                    "id": id,
+                    "rows": rows,
+                    "lines": lines,
+                    "data": {
+                        "r00": M_data[0],
+                        "r10": M_data[1],
+                        "r20": M_data[2],
+                        "r01": M_data[3],
+                        "r11": M_data[4],
+                        "r21": M_data[5],
+                        "r02": M_data[6],
+                        "r12": M_data[7],
+                        "r22": M_data[8],
+                        "r03": M_data[9],
+                        "r13": M_data[10],
+                        "r23": M_data[11]
+                    }
+                }
+            }
+            with open(self.file, 'a', encoding='utf-8') as f:
+                yaml.dump(data, f, allow_unicode=True)
 
     def conver_yaml(self, data, Types: str):
         """
@@ -117,7 +144,21 @@ class yaml_handle:
         # print(data["frame_0"]["data"]["r00"])
         Data1 = np.zeros(frames_number * 12)
         Data1 = Data1.reshape(frames_number, 12)
-        if Types == ('needletip' or 'probecam'):
+        if Types == 'needletip':
+            for i in range(frames_number):
+                Data1[i][0] = data[f"frame_{i}"]["data"]["r00"]
+                Data1[i][1] = data[f"frame_{i}"]["data"]["r01"]
+                Data1[i][2] = data[f"frame_{i}"]["data"]["r02"]
+                Data1[i][3] = data[f"frame_{i}"]["data"]["r03"]
+                Data1[i][4] = data[f"frame_{i}"]["data"]["r10"]
+                Data1[i][5] = data[f"frame_{i}"]["data"]["r11"]
+                Data1[i][6] = data[f"frame_{i}"]["data"]["r12"]
+                Data1[i][7] = data[f"frame_{i}"]["data"]["r13"]
+                Data1[i][8] = data[f"frame_{i}"]["data"]["r20"]
+                Data1[i][9] = data[f"frame_{i}"]["data"]["r21"]
+                Data1[i][10] = data[f"frame_{i}"]["data"]["r22"]
+                Data1[i][11] = data[f"frame_{i}"]["data"]["r23"]
+        elif Types == 'probecam':
             for i in range(frames_number):
                 Data1[i][0] = data[f"frame_{i}"]["data"]["r00"]
                 Data1[i][1] = data[f"frame_{i}"]["data"]["r01"]
@@ -187,15 +228,29 @@ if __name__ == '__main__':
     # elif Types == ('probecam' or 'ultrasound-pixel'):
     elif Types == 'ultrasound-pixel':
         Mat_dirpath = '../matFiles/ultrasound'
+    elif Types == 'probecam':
+        Mat_dirpath = '../matFiles/ultrasound'
     else:
         print("没有进入")
+        sys.exit(0)
     Mat_name = input("please Fill in the name of .mat file: ")
     Mat_path = os.path.join(Mat_dirpath, Mat_name)
     data = io.loadmat(Mat_path)
     Mat_var = input("please Fill in the Variable name from .mat file: ")
     Data = np.array(data[Mat_var])
 
-    if Types == ('needletip' or 'probecam'):
+    if Types == 'needletip':
+        print(Data.shape)
+        rows = Data.shape[0]
+        lines = Data.shape[1]
+        Data = Data.reshape(int(rows / 4), 12)
+        dic = {}
+        for i in range(int(rows / 4)):
+            dic[f"frame_{i}"] = Data[i].tolist()
+            yaml_op1.add_yaml(f"frame_{i}", i, 3, 4, dic[f"frame_{i}"], Types)
+        print("FINISHED")
+
+    elif Types == 'probecam':
         print(Data.shape)
         rows = Data.shape[0]
         lines = Data.shape[1]
